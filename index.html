@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
   <meta name="theme-color" content="#F6F2EB"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-title" content="Travio"/>
@@ -16,395 +16,642 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef } = React;
+const {useState,useEffect,useRef}=React;
 
-const C = {
-  bg:"#F6F2EB",card:"#FFFFFF",border:"#E8E0D2",borderHover:"#C8B89A",
-  text:"#1A1612",muted:"#7C756E",dim:"#B0A99E",
-  blue:"#2563EB",blueSoft:"#EFF6FF",
-  amber:"#C97D0A",amberSoft:"#FFFBEB",
-  green:"#15803D",greenSoft:"#F0FDF4",
-  red:"#DC2626",redSoft:"#FEF2F2",
-  rose:"#E11D48",roseSoft:"#FFF1F2",
-  violet:"#7C3AED",violetSoft:"#F5F3FF",
-  teal:"#0891B2",tealSoft:"#F0F9FF",
-  serif:"'Fraunces',Georgia,serif",
-  sans:"'Plus Jakarta Sans',system-ui,sans-serif",
-};
-const VIBE_MAP={romantic:{accent:C.rose,soft:C.roseSoft},foodie:{accent:C.amber,soft:C.amberSoft},aesthetic:{accent:C.violet,soft:C.violetSoft},local_feel:{accent:C.teal,soft:C.tealSoft},hidden_gem:{accent:C.green,soft:C.greenSoft}};
-const TIMING_MAP={book_now:{label:"Book Now ✓",color:C.green,soft:C.greenSoft},wait_week:{label:"Wait 1 Week",color:C.amber,soft:C.amberSoft},act_today:{label:"Act Today ⚡",color:C.red,soft:C.redSoft}};
-const TICON={flight:"✈",eurostar:"🚄",train:"🚆"};
+// ── THEME ─────────────────────────────────────────────────────────────────────
+const C={bg:"#F6F2EB",card:"#FFFFFF",border:"#E8E0D2",borderHover:"#C8B89A",text:"#1A1612",muted:"#7C756E",dim:"#B0A99E",blue:"#2563EB",blueSoft:"#EFF6FF",amber:"#C97D0A",amberSoft:"#FFFBEB",green:"#15803D",greenSoft:"#F0FDF4",red:"#DC2626",redSoft:"#FEF2F2",rose:"#E11D48",roseSoft:"#FFF1F2",violet:"#7C3AED",violetSoft:"#F5F3FF",teal:"#0891B2",tealSoft:"#F0F9FF",serif:"'Fraunces',Georgia,serif",sans:"'Plus Jakarta Sans',system-ui,sans-serif"};
+const VIBE={romantic:{a:C.rose,s:C.roseSoft},foodie:{a:C.amber,s:C.amberSoft},aesthetic:{a:C.violet,s:C.violetSoft},local_feel:{a:C.teal,s:C.tealSoft},hidden_gem:{a:C.green,s:C.greenSoft}};
+const TM={book_now:{l:"Book Now ✓",c:C.green,s:C.greenSoft},wait_week:{l:"Wait 1 Week",c:C.amber,s:C.amberSoft},act_today:{l:"Act Today ⚡",c:C.red,s:C.redSoft}};
+const TI={flight:"✈",eurostar:"🚄",train:"🚆"};
 
-// ── AI via Vercel Serverless Function ────────────────────────────────────────
-async function ai(prompt, maxTokens=3000) {
-  const res = await fetch("/api/ai", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({prompt, maxTokens}),
-  });
-  const d = await res.json();
-  if (!res.ok || d.error) throw new Error(d.error || `Error ${res.status}`);
-  try { return JSON.parse(d.text || "{}"); }
-  catch(e) { throw new Error("AI response was not valid JSON"); }
+// ── API ───────────────────────────────────────────────────────────────────────
+async function ai(prompt,maxTokens=3500){
+  const r=await fetch("/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,maxTokens})});
+  const d=await r.json();
+  if(!r.ok||d.error)throw new Error(d.error||`Error ${r.status}`);
+  try{return JSON.parse((d.text||"{}").replace(/```json|```/g,"").trim());}
+  catch(e){throw new Error("Invalid AI response — try again");}
 }
+function go(url){if(!url)return;if(!url.startsWith("http"))url="https://"+url;window.open(url,"_blank");}
+function tv(s){if(!s)return"aesthetic";return Object.entries(s).sort((a,b)=>b[1]-a[1])[0]?.[0]||"aesthetic";}
+function vm(trip){return trip.is_greek?{a:C.amber,s:C.amberSoft}:(VIBE[tv(trip.vibe_scores)]||VIBE.aesthetic);}
 
-
-
-// ── UTILS ─────────────────────────────────────────────────────────────────────
-function topVibe(s){if(!s)return"aesthetic";return Object.entries(s).sort((a,b)=>b[1]-a[1])[0]?.[0]||"aesthetic";}
-function huntToTrip(dest,wk){return{city:dest.city,country:dest.country,tagline:dest.one_liner,transport_type:dest.transport_type,is_greek:dest.is_greek,nights:2,outbound:{from:dest.from_airport,departs:dest.departs_fri,arrives:dest.arrives_city,price_pp:dest.flight_pp},return:{departs:dest.returns_sun,arrives:dest.arrives_london,price_pp:dest.flight_pp},hotel:{name:`${dest.city} boutique hotel`,type:"boutique",neighbourhood:"City centre",price_per_night:dest.hotel_night_pp*2},vibe_scores:{romantic:7,foodie:7,aesthetic:7,local_feel:7,hidden_gem:7},budget_2days:{transport:dest.flight_pp*4,hotel:dest.hotel_night_pp*4,food:Math.round(dest.total_2pax*0.2),activities:Math.round(dest.total_2pax*0.1),transport_local:Math.round(dest.total_2pax*0.05),total:dest.total_2pax},escape_score:dest.escape_score,why_this_weekend:dest.one_liner,hidden_gem_tip:"",top_vibes:dest.vibe_tags||[],timing:dest.timing};}
-function Badge({label,color,soft,small}){return <span style={{display:"inline-flex",fontSize:small?10:11,fontFamily:C.sans,color,background:soft,border:`1px solid ${color}33`,borderRadius:20,padding:small?"2px 8px":"4px 10px",whiteSpace:"nowrap",fontWeight:500}}>{label}</span>;}
-function TimingBadge({signal,small}){const t=TIMING_MAP[signal];if(!t)return null;return <Badge label={t.label} color={t.color} soft={t.soft} small={small}/>;}
-function ScoreBar({label,value,color}){return(<div style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,color:C.muted,fontFamily:C.sans,textTransform:"capitalize"}}>{label.replace("_"," ")}</span><span style={{fontSize:12,color,fontWeight:600,fontFamily:C.sans}}>{value}</span></div><div style={{height:4,background:C.border,borderRadius:99}}><div style={{height:4,width:`${value*10}%`,background:color,borderRadius:99}}/></div></div>);}
-function Loader({text,sub}){return(<div style={{padding:"56px 24px",textAlign:"center"}}><div style={{fontSize:16,fontFamily:C.serif,fontStyle:"italic",color:C.muted,marginBottom:6}}>{text}</div><div style={{fontSize:12,color:C.dim,fontFamily:C.sans}}>{sub}</div></div>);}
-function ErrBox({msg,onRetry}){return(<div style={{margin:"0 0 16px",background:C.redSoft,border:`1px solid ${C.red}33`,borderRadius:12,padding:16}}><div style={{fontSize:12,color:C.red,fontFamily:C.sans,marginBottom:10,lineHeight:1.5}}>❌ {msg}</div><button onClick={onRetry} style={{fontSize:12,fontFamily:C.sans,background:C.red,color:"#fff",border:"none",borderRadius:8,padding:"7px 16px",cursor:"pointer"}}>Try Again</button></div>);}
-
-// ── PROMPTS ───────────────────────────────────────────────────────────────────
-const HUNTER_P=`Find 4 cheapest upcoming weekend escapes from London. Outbound Friday after 18:30 from LHR/LGW/LCY or Eurostar. Return Sunday 20:00-23:30. Include 1 Greek option (Athens or Thessaloniki).
-Return JSON: {"weekends":[{"label":"Fri 6 Jun – Sun 8 Jun","depart_date":"2025-06-06","cheapest_total_2pax":320,"value_tier":"great","why_cheap":"Low-cost carrier sale this week","destinations":[{"city":"Porto","country":"Portugal","is_greek":false,"transport_type":"flight","from_airport":"LGW","departs_fri":"19:30","arrives_city":"22:00","returns_sun":"20:30","arrives_london":"22:45","flight_pp":45,"hotel_night_pp":60,"total_2pax":320,"escape_score":88,"vibe_tags":["river views","natural wine","cobblestone"],"one_liner":"Sun-drenched city with the best wine bars in Europe","timing":{"signal":"book_now","reason":"Prices rising next week"}}]}]}
-Sort weekends cheapest first. Use realistic 2025 GBP prices.`;
-
-const WEEKEND_P=`Find 6 weekend escapes from London departing this Friday after 18:30 (LHR/LGW/LCY or Eurostar) returning Sunday 20:00-23:30. Include 1 Greek option.
-Return JSON: {"trips":[{"city":"Lisbon","country":"Portugal","tagline":"Golden light and pasteis","transport_type":"flight","is_greek":false,"outbound":{"from":"LGW","departs":"19:15","arrives":"22:30","price_pp":65},"return":{"departs":"20:45","arrives":"23:00","price_pp":70},"hotel":{"name":"Casa do Bairro","type":"boutique","neighbourhood":"Alfama","price_per_night":95},"vibe_scores":{"romantic":8,"foodie":9,"aesthetic":8,"local_feel":7,"hidden_gem":6},"budget_2days":{"transport":270,"hotel":190,"food":120,"activities":60,"transport_local":30,"total":670},"escape_score":87,"why_this_weekend":"Perfect weather window, low crowds this weekend","hidden_gem_tip":"Try Taberna da Rua das Flores for lunch — no tourists","top_vibes":["golden light","pasteis","miradouros"],"timing":{"signal":"book_now","confidence":85,"reason":"Prices up 20% next weekend"}}]}`;
-
-const CUSTOM_P=(from,dest,dep,ret,pax,budget)=>`Find 5 trip options from ${from} to ${dest||"best destinations"}, departing ${dep} returning ${ret}, ${pax} travellers, max £${budget}pp.
-Return JSON: {"trips":[{"city":"Barcelona","country":"Spain","tagline":"Beach meets architecture","transport_type":"flight","is_greek":false,"nights":3,"outbound":{"from":"LHR","departs":"07:30","arrives":"11:00","price_pp":89,"date":"${dep}"},"return":{"departs":"18:30","arrives":"20:00","price_pp":95,"date":"${ret}"},"hotel":{"name":"Hotel Arts","type":"design","neighbourhood":"Barceloneta","price_per_night":140},"vibe_scores":{"romantic":7,"foodie":9,"aesthetic":8,"local_feel":6,"hidden_gem":5},"budget_total":{"transport":370,"hotel":420,"food":200,"activities":120,"transport_local":50,"total":1160},"escape_score":85,"why_go":"Perfect weather, Primavera Sound festival this weekend","hidden_gem_tip":"Skip La Boqueria, go to Mercat de l'Abaceria instead","top_vibes":["beach","tapas","architecture"],"timing":{"signal":"wait_week","confidence":70,"reason":"Prices may drop mid-week"}}]}`;
-
-const GREECE_P=`Find cheapest upcoming weekends London to Athens and Thessaloniki, next 8 weekends.
-Return JSON: {"athens":[{"weekend_label":"Fri 6 Jun – Sun 8 Jun","price_pp_return":89,"airline":"EasyJet","departs_fri":"20:15","returns_sun":"21:30","price_signal":"book_now","hotel_avg_pp":55,"total_pp":254,"crowd_level":"low","weather":"27°C sunny"}],"thessaloniki":[{"weekend_label":"Fri 6 Jun – Sun 8 Jun","price_pp_return":105,"airline":"Ryanair","departs_fri":"19:45","returns_sun":"20:50","price_signal":"wait_week","hotel_avg_pp":45,"total_pp":240,"crowd_level":"low","weather":"25°C sunny"}]}
-8 weekends each. Realistic 2025 GBP prices.`;
-
-const IT_P=(city,country,vibes)=>`Create a vivid 2-night itinerary for ${city}, ${country}. Arriving Friday evening (~22:00), departing Sunday (~18:30). Focus on: ${vibes}.
-Return JSON: {"days":[{"label":"Friday Night","items":[{"time":"22:30","title":"Taberna do Largo","desc":"A candlelit wine bar hidden in a 16th-century courtyard — order the house white and the octopus","type":"bar"}]},{"label":"Saturday","items":[{"time":"09:00","title":"Pastelaria Versailles","desc":"Art deco cafe serving the city's best pastel de nata since 1922","type":"cafe"}]},{"label":"Sunday","items":[{"time":"10:00","title":"LX Factory Sunday Market","desc":"Browse vintage finds and local design in this converted industrial space","type":"explore"}]}]}
-Friday: 2 items. Saturday: 6 items. Sunday: 4 items. Use real, specific venue names.`;
-
-const TIMING_P=(route)=>`Analyse flight price timing for: ${route}. Should I book now or wait?
-Return JSON: {"analysis":{"route":"${route}","current_price_pp":145,"historic_avg_pp":160,"lowest_seen_pp":89,"trend":"falling","signal":"wait_week","confidence":72,"recommendation":"Prices are above average but falling. Wait 5-7 days before booking.","reasons":["Prices typically drop 3 weeks before departure","No major events this weekend driving demand","Competitor routes still have availability"],"airline_sales":"EasyJet sale expected Tuesday, Ryanair mid-week drops common","best_booking_window":"2-3 weeks before for best prices on this route"}}`;
+// ── SMALL COMPONENTS ──────────────────────────────────────────────────────────
+function Badge({l,c,s,sm}){return <span style={{display:"inline-flex",fontSize:sm?10:11,fontFamily:C.sans,color:c,background:s,border:`1px solid ${c}33`,borderRadius:20,padding:sm?"2px 8px":"4px 10px",whiteSpace:"nowrap",fontWeight:500}}>{l}</span>;}
+function TMBadge({sig,sm}){const t=TM[sig];if(!t)return null;return <Badge l={t.l} c={t.c} s={t.s} sm={sm}/>;}
+function Bar({label,v,c}){return(<div style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,color:C.muted,fontFamily:C.sans,textTransform:"capitalize"}}>{label.replace("_"," ")}</span><span style={{fontSize:12,color:c,fontWeight:600,fontFamily:C.sans}}>{v}</span></div><div style={{height:4,background:C.border,borderRadius:99}}><div style={{height:4,width:`${v*10}%`,background:c,borderRadius:99}}/></div></div>);}
+function Spin({text,sub}){return(<div style={{padding:"56px 24px",textAlign:"center"}}><div style={{fontSize:16,fontFamily:C.serif,fontStyle:"italic",color:C.muted,marginBottom:6}}>{text}</div><div style={{fontSize:12,color:C.dim,fontFamily:C.sans}}>{sub}</div></div>);}
+function Err({msg,retry}){return(<div style={{margin:"0 0 16px",background:C.redSoft,border:`1px solid ${C.red}33`,borderRadius:12,padding:16}}><div style={{fontSize:12,color:C.red,fontFamily:C.sans,marginBottom:10,lineHeight:1.5}}>❌ {msg}</div><button onClick={retry} style={{fontSize:12,fontFamily:C.sans,background:C.red,color:"#fff",border:"none",borderRadius:8,padding:"7px 16px",cursor:"pointer"}}>Try Again</button></div>);}
+function BookBtns({b}){if(!b)return null;return(<div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>{b.flight_url&&<button onClick={()=>go(b.flight_url)} style={{fontSize:11,fontFamily:C.sans,fontWeight:600,background:C.blue,color:"#fff",border:"none",borderRadius:20,padding:"6px 14px",cursor:"pointer"}}>✈ {b.flight_site||"Book Flight"}</button>}{b.hotel_url&&<button onClick={()=>go(b.hotel_url)} style={{fontSize:11,fontFamily:C.sans,fontWeight:600,background:C.violet,color:"#fff",border:"none",borderRadius:20,padding:"6px 14px",cursor:"pointer"}}>🏨 {b.hotel_site||"Book Hotel"}</button>}</div>);}
+function SubTabs({tabs,active,onSelect,color}){return(<div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>{tabs.map(([k,l])=>(<button key={k} onClick={()=>onSelect(k)} style={{fontSize:11,borderRadius:20,padding:"5px 12px",cursor:"pointer",fontFamily:C.sans,fontWeight:500,border:"1px solid",borderColor:active===k?(color||C.blue)+"66":C.border,color:active===k?(color||C.blue):C.muted,background:active===k?(color||C.blue)+"15":C.card}}>{l}</button>))}
+</div>);}
 
 // ── TRIP CARD ─────────────────────────────────────────────────────────────────
-function TripCard({trip,onSelect}){
-  const tv=topVibe(trip.vibe_scores);
-  const vm=trip.is_greek?{accent:C.amber,soft:C.amberSoft}:(VIBE_MAP[tv]||VIBE_MAP.aesthetic);
-  const budget=trip.budget_2days?.total||trip.budget_total?.total||0;
-  const sc=trip.escape_score>=85?C.green:trip.escape_score>=70?C.amber:C.rose;
-  return(
-    <div onClick={()=>onSelect(trip)} style={{background:C.card,borderRadius:16,border:`1px solid ${C.border}`,overflow:"hidden",cursor:"pointer",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:12,transition:"transform 0.15s,box-shadow 0.2s"}}
-      onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.11)";}}
-      onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)";}}>
-      <div style={{height:5,background:vm.accent}}/>
-      <div style={{padding:"18px 20px 20px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
-          <div style={{flex:1,marginRight:12}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-              <span style={{fontSize:13}}>{TICON[trip.transport_type]||"✈"}</span>
-              <span style={{fontSize:10,color:C.muted,fontFamily:C.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>{trip.outbound?.from}</span>
-              {trip.is_greek&&<Badge label="🇬🇷" color={C.amber} soft={C.amberSoft} small/>}
-            </div>
-            <div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,lineHeight:1.1,marginBottom:2}}>{trip.city}</div>
-            <div style={{fontSize:12,color:C.muted,fontFamily:C.sans}}>{trip.country}</div>
-            <div style={{fontSize:12,color:C.dim,fontFamily:C.sans,marginTop:3,fontStyle:"italic"}}>{trip.tagline}</div>
+function TCard({trip,onSelect,accent}){
+  const v=vm(trip),bgt=trip.budget_2days?.total||trip.budget_total?.total||trip.budget_week?.total||0,sc=trip.escape_score>=85?C.green:trip.escape_score>=70?C.amber:C.rose,ac=accent||v.a;
+  return(<div onClick={()=>onSelect(trip)} style={{background:C.card,borderRadius:16,border:`1px solid ${C.border}`,overflow:"hidden",cursor:"pointer",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",marginBottom:12,transition:"transform .15s,box-shadow .2s"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,.11)";}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,.06)";}}>
+    <div style={{height:5,background:ac}}/>
+    <div style={{padding:"18px 20px 20px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+        <div style={{flex:1,marginRight:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+            <span style={{fontSize:13}}>{TI[trip.transport_type]||"✈"}</span>
+            <span style={{fontSize:10,color:C.muted,fontFamily:C.sans,letterSpacing:"0.06em",textTransform:"uppercase"}}>{trip.outbound?.from||trip.continent||""}</span>
+            {trip.is_greek&&<Badge l="🇬🇷" c={C.amber} s={C.amberSoft} sm/>}
           </div>
-          <div style={{textAlign:"right",flexShrink:0}}>
-            <div style={{fontSize:22,fontFamily:C.serif,color:sc,fontWeight:500,lineHeight:1}}>{trip.escape_score}</div>
-            <div style={{fontSize:9,color:C.dim,fontFamily:C.sans,marginTop:2}}>SCORE</div>
-          </div>
+          <div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,lineHeight:1.1,marginBottom:2}}>{trip.city}</div>
+          <div style={{fontSize:12,color:C.muted,fontFamily:C.sans}}>{trip.country}</div>
+          <div style={{fontSize:12,color:C.dim,fontFamily:C.sans,marginTop:3,fontStyle:"italic"}}>{trip.tagline||trip.one_liner}</div>
         </div>
-        <div style={{background:C.bg,borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between"}}>
-          <div><div style={{fontSize:9,color:C.dim,fontFamily:C.sans,marginBottom:2}}>FRI OUT</div><div style={{fontSize:14,fontFamily:C.sans,fontWeight:600,color:C.text}}>{trip.outbound?.departs}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>→ {trip.outbound?.arrives}</div></div>
-          <div style={{width:1,background:C.border}}/>
-          <div style={{textAlign:"right"}}><div style={{fontSize:9,color:C.dim,fontFamily:C.sans,marginBottom:2}}>SUN BACK</div><div style={{fontSize:14,fontFamily:C.sans,fontWeight:600,color:C.text}}>{trip.return?.departs}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>→ {trip.return?.arrives}</div></div>
-        </div>
-        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>{(trip.top_vibes||[]).map((v,i)=>(<span key={i} style={{fontSize:11,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:20,padding:"3px 10px",fontFamily:C.sans}}>{v}</span>))}</div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`,paddingTop:14}}>
-          <div><div style={{fontSize:22,fontFamily:C.serif,color:C.text,fontWeight:500}}>£{budget}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>2 people · 2 days</div></div>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}><TimingBadge signal={trip.timing?.signal}/><span style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>see escape →</span></div>
+        <div style={{textAlign:"right",flexShrink:0}}>
+          <div style={{fontSize:22,fontFamily:C.serif,color:sc,fontWeight:500,lineHeight:1}}>{trip.escape_score}</div>
+          <div style={{fontSize:9,color:C.dim,fontFamily:C.sans,marginTop:2}}>SCORE</div>
         </div>
       </div>
+      {(trip.outbound?.departs||trip.return?.departs)&&<div style={{background:C.bg,borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",justifyContent:"space-between"}}>
+        <div><div style={{fontSize:9,color:C.dim,fontFamily:C.sans,marginBottom:2}}>OUT{trip.outbound?.date?` · ${trip.outbound.date}`:""}</div><div style={{fontSize:14,fontFamily:C.sans,fontWeight:600,color:C.text}}>{trip.outbound?.departs||"—"}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>→ {trip.outbound?.arrives||"—"}</div></div>
+        <div style={{width:1,background:C.border}}/>
+        <div style={{textAlign:"right"}}><div style={{fontSize:9,color:C.dim,fontFamily:C.sans,marginBottom:2}}>RETURN{trip.return?.date?` · ${trip.return.date}`:""}</div><div style={{fontSize:14,fontFamily:C.sans,fontWeight:600,color:C.text}}>{trip.return?.departs||"—"}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>→ {trip.return?.arrives||"—"}</div></div>
+      </div>}
+      {trip.itinerary_highlights&&<div style={{background:C.bg,borderRadius:10,padding:"10px 14px",marginBottom:12}}><div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{trip.itinerary_highlights.map((h,i)=><span key={i} style={{fontSize:10,color:C.muted,background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:"2px 8px",fontFamily:C.sans}}>{h}</span>)}</div></div>}
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>{(trip.top_vibes||[]).map((v2,i)=><span key={i} style={{fontSize:11,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:20,padding:"3px 10px",fontFamily:C.sans}}>{v2}</span>)}</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.border}`,paddingTop:14}}>
+        <div><div style={{fontSize:22,fontFamily:C.serif,color:C.text,fontWeight:500}}>£{bgt}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>{trip.nights||2} nights · 2 people</div></div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}><TMBadge sig={trip.timing?.signal}/><span style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>details →</span></div>
+      </div>
     </div>
-  );
+  </div>);
 }
 
 // ── TRIP DETAIL ───────────────────────────────────────────────────────────────
-function TripDetail({trip,onBack}){
+function TDetail({trip,onBack}){
   const [tab,setTab]=useState("overview");
-  const [itinerary,setItinerary]=useState(null);
-  const [itLoading,setItLoading]=useState(false);
-  const [itErr,setItErr]=useState("");
-  const tv=topVibe(trip.vibe_scores);
-  const vm=trip.is_greek?{accent:C.amber,soft:C.amberSoft}:(VIBE_MAP[tv]||VIBE_MAP.aesthetic);
-  const budget=trip.budget_2days||trip.budget_total||{};
-  const TYPE_COL={food:C.amber,bar:C.rose,walk:C.teal,cafe:C.amber,culture:C.violet,activity:C.blue,hotel:C.teal,explore:C.green};
-  async function loadIt(){
-    setItLoading(true);setItErr("");
-    try{const d=await ai(IT_P(trip.city,trip.country,(trip.top_vibes||[]).join(", ")),2000);setItinerary(d.days||[]);}
-    catch(e){setItErr(e.message);}
-    setItLoading(false);
-  }
-  useEffect(()=>{if(tab==="itinerary"&&!itinerary)loadIt();},[tab]);
-  return(
-    <div style={{background:C.bg,minHeight:"100%",fontFamily:C.sans}}>
-      <div style={{background:vm.accent,padding:"20px 20px 28px"}}>
-        <button onClick={onBack} style={{background:"rgba(255,255,255,0.25)",border:"none",borderRadius:20,color:"#fff",cursor:"pointer",padding:"6px 14px",fontSize:12,fontFamily:C.sans,marginBottom:20}}>← back</button>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
-          <div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginBottom:4}}>{TICON[trip.transport_type]||"✈"} {trip.transport_type} · {trip.outbound?.from}</div>
-            <div style={{fontSize:36,fontFamily:C.serif,fontStyle:"italic",color:"#fff",lineHeight:1.05}}>{trip.city}</div>
-            <div style={{fontSize:14,color:"rgba(255,255,255,0.8)",marginTop:3}}>{trip.country}</div>
-          </div>
-          <div style={{textAlign:"right"}}><div style={{fontSize:30,fontFamily:C.serif,color:"#fff",fontWeight:500}}>£{budget.total}</div><div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>2 people</div></div>
+  const [it,setIt]=useState(null);
+  const [itL,setItL]=useState(false);
+  const [itE,setItE]=useState("");
+  const v=vm(trip),bgt=trip.budget_2days||trip.budget_total||trip.budget_week||{},nights=trip.nights||2;
+  const TC={food:C.amber,bar:C.rose,walk:C.teal,cafe:C.amber,culture:C.violet,activity:C.blue,hotel:C.teal,explore:C.green};
+  async function loadIt(){setItL(true);setItE("");try{const d=await ai(`Create a vivid ${nights}-night itinerary for ${trip.city}, ${trip.country}. Focus on: ${(trip.top_vibes||[]).join(", ")}. Return JSON: {"days":[{"label":string,"items":[{"time":string,"title":string,"desc":string,"type":"food|bar|walk|cafe|culture|activity|hotel"}]}]}. Use real venue names.`,2500);setIt(d.days||[]);}catch(e){setItE(e.message);}setItL(false);}
+  useEffect(()=>{if(tab==="itinerary"&&!it)loadIt();},[tab]);
+  return(<div style={{background:C.bg,minHeight:"100%",fontFamily:C.sans}}>
+    <div style={{background:v.a,padding:"20px 20px 28px"}}>
+      <button onClick={onBack} style={{background:"rgba(255,255,255,0.25)",border:"none",borderRadius:20,color:"#fff",cursor:"pointer",padding:"6px 14px",fontSize:12,fontFamily:C.sans,marginBottom:20}}>← back</button>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+        <div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.7)",marginBottom:4}}>{trip.continent||((TI[trip.transport_type]||"✈")+" "+(trip.outbound?.from||""))}</div>
+          <div style={{fontSize:36,fontFamily:C.serif,fontStyle:"italic",color:"#fff",lineHeight:1.05}}>{trip.city}</div>
+          <div style={{fontSize:14,color:"rgba(255,255,255,.8)",marginTop:3}}>{trip.country}</div>
         </div>
-      </div>
-      <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,display:"flex",position:"sticky",top:0,zIndex:10}}>
-        {["overview","itinerary","budget"].map(t=>(<button key={t} onClick={()=>setTab(t)} style={{flex:1,background:"none",border:"none",borderBottom:tab===t?`2px solid ${vm.accent}`:"2px solid transparent",color:tab===t?vm.accent:C.muted,cursor:"pointer",padding:"14px 8px",fontSize:12,fontFamily:C.sans,fontWeight:tab===t?600:400,textTransform:"capitalize"}}>{t}</button>))}
-      </div>
-      <div style={{padding:"24px 20px"}}>
-        {tab==="overview"&&(<div>
-          <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
-            <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:12,textTransform:"uppercase"}}>Flights</div>
-            {[["OUT",trip.outbound,vm.accent],["RETURN",trip.return,C.teal]].map(([lbl,leg,col])=>(<div key={lbl} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:lbl==="OUT"?`1px solid ${C.border}`:"none"}}><div><div style={{fontSize:10,color:C.dim,marginBottom:3}}>{lbl}{lbl==="OUT"?` · ${trip.outbound?.from}`:""}</div><div style={{fontSize:15,fontFamily:C.sans,fontWeight:600,color:C.text}}>{leg?.departs} → {leg?.arrives}</div></div><div style={{fontSize:15,color:col,fontWeight:600}}>£{leg?.price_pp}<span style={{fontSize:10,fontWeight:400,color:C.muted}}>pp</span></div></div>))}
-          </div>
-          <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
-            <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:10,textTransform:"uppercase"}}>Hotel</div>
-            <div style={{fontSize:18,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:3}}>{trip.hotel?.name}</div>
-            <div style={{fontSize:12,color:C.muted}}>{trip.hotel?.type} · {trip.hotel?.neighbourhood}</div>
-            <div style={{fontSize:15,color:vm.accent,fontWeight:600,marginTop:8}}>£{trip.hotel?.price_per_night}<span style={{fontSize:11,fontWeight:400,color:C.muted}}>/night</span></div>
-          </div>
-          <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
-            <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:14,textTransform:"uppercase"}}>Vibe Scores</div>
-            {Object.entries(trip.vibe_scores||{}).map(([k,v])=>(<ScoreBar key={k} label={k} value={v} color={VIBE_MAP[k]?.accent||vm.accent}/>))}
-          </div>
-          <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
-            <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:10,textTransform:"uppercase"}}>Why This Weekend</div>
-            <div style={{fontSize:14,color:C.text,fontFamily:C.serif,fontStyle:"italic",lineHeight:1.7}}>{trip.why_this_weekend||trip.why_go}</div>
-          </div>
-          <div style={{background:vm.soft,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${vm.accent}22`}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",textTransform:"uppercase"}}>Price Signal</div><TimingBadge signal={trip.timing?.signal}/></div>
-            <div style={{fontSize:13,color:C.text,fontFamily:C.sans,lineHeight:1.6}}>{trip.timing?.reason}</div>
-          </div>
-          {trip.hidden_gem_tip&&<div style={{background:C.card,borderRadius:14,padding:18,border:`1px solid ${C.border}`}}><div style={{fontSize:10,color:C.amber,letterSpacing:"0.1em",marginBottom:8,textTransform:"uppercase"}}>💎 Local Secret</div><div style={{fontSize:14,color:C.text,fontFamily:C.serif,fontStyle:"italic",lineHeight:1.7}}>{trip.hidden_gem_tip}</div></div>}
-        </div>)}
-        {tab==="itinerary"&&(<div>
-          {itLoading&&<Loader text="Building your escape plan..." sub="Finding the best local spots..."/>}
-          {itErr&&<ErrBox msg={itErr} onRetry={loadIt}/>}
-          {!itLoading&&!itErr&&(itinerary||[]).map((day,di)=>(<div key={di} style={{marginBottom:28}}><div style={{fontSize:16,fontFamily:C.serif,fontStyle:"italic",color:vm.accent,marginBottom:16}}>{day.label}</div>{(day.items||[]).map((item,ii)=>(<div key={ii} style={{display:"flex",gap:14,marginBottom:16}}><div style={{flexShrink:0,width:44,paddingTop:2}}><div style={{fontSize:11,color:C.dim,fontFamily:C.sans}}>{item.time}</div></div><div style={{width:3,background:{food:C.amber,bar:C.rose,walk:C.teal,cafe:C.amber,culture:C.violet,activity:C.blue,hotel:C.teal,explore:C.green}[item.type]||C.border,borderRadius:99,flexShrink:0,minHeight:40}}/><div><div style={{fontSize:14,fontFamily:C.sans,fontWeight:600,color:C.text,marginBottom:3}}>{item.title}</div><div style={{fontSize:12,color:C.muted,fontFamily:C.sans,lineHeight:1.6}}>{item.desc}</div></div></div>))}</div>))}
-        </div>)}
-        {tab==="budget"&&(<div>
-          <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
-            <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:16,textTransform:"uppercase"}}>Full Breakdown · 2 People</div>
-            {[["Flights",budget.transport],[`Hotel (${trip.nights||2} nights)`,budget.hotel],["Food & Drink",budget.food],["Activities",budget.activities],["Local Transport",budget.transport_local]].map(([l,a])=>(<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"11px 0",borderBottom:`1px solid ${C.border}`}}><span style={{fontSize:13,color:C.muted,fontFamily:C.sans}}>{l}</span><span style={{fontSize:13,color:C.text,fontFamily:C.sans,fontWeight:500}}>£{a}</span></div>))}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"14px 0 4px"}}><span style={{fontSize:15,color:C.text,fontFamily:C.sans,fontWeight:600}}>Total</span><span style={{fontSize:20,color:vm.accent,fontFamily:C.serif,fontWeight:500}}>£{budget.total}</span></div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {[["PER PERSON",`£${Math.round((budget.total||0)/2)}`,"all-in"],["PER DAY",`£${Math.round((budget.total||0)/2/(trip.nights||2))}`,"per person"]].map(([l,v,s])=>(<div key={l} style={{background:C.card,borderRadius:12,padding:16,border:`1px solid ${C.border}`,textAlign:"center"}}><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans}}>{l}</div><div style={{fontSize:26,fontFamily:C.serif,color:vm.accent,fontWeight:500}}>{v}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans,marginTop:3}}>{s}</div></div>))}
-          </div>
-        </div>)}
+        <div style={{textAlign:"right"}}><div style={{fontSize:30,fontFamily:C.serif,color:"#fff",fontWeight:500}}>£{bgt.total}</div><div style={{fontSize:11,color:"rgba(255,255,255,.7)"}}>{nights} nights · 2 ppl</div></div>
       </div>
     </div>
-  );
+    <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,display:"flex",position:"sticky",top:0,zIndex:10}}>
+      {["overview","itinerary","budget"].map(t=><button key={t} onClick={()=>setTab(t)} style={{flex:1,background:"none",border:"none",borderBottom:tab===t?`2px solid ${v.a}`:"2px solid transparent",color:tab===t?v.a:C.muted,cursor:"pointer",padding:"14px 8px",fontSize:12,fontFamily:C.sans,fontWeight:tab===t?600:400,textTransform:"capitalize"}}>{t}</button>)}
+    </div>
+    <div style={{padding:"24px 20px"}}>
+      {tab==="overview"&&<div>
+        <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:12,textTransform:"uppercase"}}>Transport</div>
+          {[["OUT",trip.outbound,v.a],["RETURN",trip.return,C.teal]].map(([lbl,leg,col])=><div key={lbl} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:lbl==="OUT"?`1px solid ${C.border}`:"none"}}><div><div style={{fontSize:10,color:C.dim,marginBottom:3}}>{lbl}{leg?.date?` · ${leg.date}`:""}{lbl==="OUT"&&trip.outbound?.from?` · ${trip.outbound.from}`:""}{leg?.airline?` · ${leg.airline}`:""}</div><div style={{fontSize:15,fontFamily:C.sans,fontWeight:600,color:C.text}}>{leg?.departs||"—"} → {leg?.arrives||"—"}</div></div><div style={{fontSize:15,color:col,fontWeight:600}}>£{leg?.price_pp}<span style={{fontSize:10,fontWeight:400,color:C.muted}}>pp</span></div></div>)}
+          <BookBtns b={trip.booking}/>
+        </div>
+        <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:10,textTransform:"uppercase"}}>Hotel</div>
+          <div style={{fontSize:18,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:3}}>{trip.hotel?.name}</div>
+          <div style={{fontSize:12,color:C.muted}}>{trip.hotel?.type} · {trip.hotel?.neighbourhood}</div>
+          <div style={{fontSize:15,color:v.a,fontWeight:600,marginTop:8}}>£{trip.hotel?.price_per_night}<span style={{fontSize:11,fontWeight:400,color:C.muted}}>/night</span></div>
+          {trip.booking?.hotel_url&&<button onClick={()=>go(trip.booking.hotel_url)} style={{marginTop:10,fontSize:11,fontFamily:C.sans,fontWeight:600,background:C.violet,color:"#fff",border:"none",borderRadius:20,padding:"6px 14px",cursor:"pointer"}}>🏨 Book Hotel</button>}
+        </div>
+        {trip.itinerary_highlights&&<div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}><div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:12,textTransform:"uppercase"}}>Highlights</div>{trip.itinerary_highlights.map((h,i)=><div key={i} style={{fontSize:13,color:C.text,fontFamily:C.sans,padding:"6px 0",borderBottom:i<trip.itinerary_highlights.length-1?`1px solid ${C.border}`:"none",display:"flex",gap:10}}><span style={{color:v.a}}>›</span>{h}</div>)}</div>}
+        <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}><div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:14,textTransform:"uppercase"}}>Vibe Scores</div>{Object.entries(trip.vibe_scores||{}).map(([k,val])=><Bar key={k} label={k} v={val} c={VIBE[k]?.a||v.a}/>)}</div>
+        <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}><div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:10,textTransform:"uppercase"}}>Why Go</div><div style={{fontSize:14,color:C.text,fontFamily:C.serif,fontStyle:"italic",lineHeight:1.7}}>{trip.why_this_weekend||trip.why_go||trip.why}</div></div>
+        <div style={{background:v.s,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${v.a}22`}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",textTransform:"uppercase"}}>Price Signal</div><TMBadge sig={trip.timing?.signal}/></div><div style={{fontSize:13,color:C.text,fontFamily:C.sans,lineHeight:1.6}}>{trip.timing?.reason}</div></div>
+        {trip.hidden_gem_tip&&<div style={{background:C.card,borderRadius:14,padding:18,border:`1px solid ${C.border}`}}><div style={{fontSize:10,color:C.amber,letterSpacing:"0.1em",marginBottom:8,textTransform:"uppercase"}}>💎 Local Secret</div><div style={{fontSize:14,color:C.text,fontFamily:C.serif,fontStyle:"italic",lineHeight:1.7}}>{trip.hidden_gem_tip}</div></div>}
+      </div>}
+      {tab==="itinerary"&&<div>
+        {itL&&<Spin text="Building your itinerary..." sub="Finding the best local spots..."/>}
+        {itE&&<Err msg={itE} retry={loadIt}/>}
+        {!itL&&!itE&&(it||[]).map((day,di)=><div key={di} style={{marginBottom:28}}><div style={{fontSize:16,fontFamily:C.serif,fontStyle:"italic",color:v.a,marginBottom:16}}>{day.label}</div>{(day.items||[]).map((item,ii)=><div key={ii} style={{display:"flex",gap:14,marginBottom:16}}><div style={{flexShrink:0,width:44,paddingTop:2}}><div style={{fontSize:11,color:C.dim,fontFamily:C.sans}}>{item.time}</div></div><div style={{width:3,background:TC[item.type]||C.border,borderRadius:99,flexShrink:0,minHeight:40}}/><div><div style={{fontSize:14,fontFamily:C.sans,fontWeight:600,color:C.text,marginBottom:3}}>{item.title}</div><div style={{fontSize:12,color:C.muted,fontFamily:C.sans,lineHeight:1.6}}>{item.desc}</div></div></div>)}</div>)}
+      </div>}
+      {tab==="budget"&&<div>
+        <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:14,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:16,textTransform:"uppercase"}}>Full Breakdown · 2 People</div>
+          {[["Flights",bgt.transport],[`Hotel (${nights} nights)`,bgt.hotel],["Food & Drink",bgt.food],["Activities",bgt.activities],["Local Transport",bgt.transport_local]].map(([l,a])=><div key={l} style={{display:"flex",justifyContent:"space-between",padding:"11px 0",borderBottom:`1px solid ${C.border}`}}><span style={{fontSize:13,color:C.muted,fontFamily:C.sans}}>{l}</span><span style={{fontSize:13,color:C.text,fontFamily:C.sans,fontWeight:500}}>£{a}</span></div>)}
+          <div style={{display:"flex",justifyContent:"space-between",padding:"14px 0 4px"}}><span style={{fontSize:15,color:C.text,fontFamily:C.sans,fontWeight:600}}>Total</span><span style={{fontSize:20,color:v.a,fontFamily:C.serif,fontWeight:500}}>£{bgt.total}</span></div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{[["PER PERSON",`£${Math.round((bgt.total||0)/2)}`,"all-in"],["PER DAY",`£${Math.round((bgt.total||0)/2/nights)}`,"per person"]].map(([l,val,sub])=><div key={l} style={{background:C.card,borderRadius:12,padding:16,border:`1px solid ${C.border}`,textAlign:"center"}}><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans}}>{l}</div><div style={{fontSize:26,fontFamily:C.serif,color:v.a,fontWeight:500}}>{val}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans,marginTop:3}}>{sub}</div></div>)}</div>
+      </div>}
+    </div>
+  </div>);
 }
+
+// ── PROMPTS ───────────────────────────────────────────────────────────────────
+const HUNTER_P=`Find 15 upcoming weekend escapes from London over the next 6 months. Friday after 18:30 departure. Return Sunday 20:00-23:30. Include 1+ Greek options. Mark is_budget:true on those under £500 for 2 people total. Sort cheapest first.
+Return JSON:{"weekends":[{"label":str,"depart_date":str,"cheapest_total_2pax":num,"value_tier":"great"|"good"|"fair","is_budget":bool,"why_cheap":str,"destinations":[{"city":str,"country":str,"is_greek":bool,"transport_type":"flight"|"eurostar"|"train","from_airport":str,"departs_fri":str,"arrives_city":str,"returns_sun":str,"arrives_london":str,"flight_pp":num,"hotel_night_pp":num,"total_2pax":num,"escape_score":num,"vibe_tags":[str,str,str],"one_liner":str,"timing":{"signal":"book_now"|"wait_week"|"act_today","reason":str},"booking":{"flight_url":str,"flight_site":str,"hotel_url":str,"hotel_site":str}}]}]}
+15 weekends, 3 destinations each. Realistic 2025-2026 GBP.`;
+
+const SPONTANEOUS_P=`Find 5 genuine last-minute flight deals from London airports (LHR/LGW/LCY/STN) departing TODAY after 17:00 or TOMORROW before 12:00. Airlines often discount heavily to fill empty seats. Return same weekend.
+Return JSON:{"deals":[{"city":str,"country":str,"airport_from":str,"departs":str,"arrives":str,"returns":str,"price_pp":num,"total_2pax":num,"hotel_night_pp":num,"total_with_hotel":num,"airline":str,"why_cheap":str,"vibe_tags":[str,str,str],"escape_score":num,"timing":{"signal":"act_today","reason":str},"booking":{"flight_url":str,"flight_site":str,"hotel_url":str}}]}
+5 deals. Last-minute urgency. Realistic bargain prices.`;
+
+const WEATHER_P=(weather,maxBudget)=>`Find 5 upcoming weekends from London where the destination has ${weather} weather AND total cost under £${maxBudget} for 2 people. Friday evening departure, Sunday return.
+Return JSON:{"windows":[{"city":str,"country":str,"weekend_label":str,"depart_date":str,"transport_type":str,"from_airport":str,"departs_fri":str,"returns_sun":str,"flight_pp":num,"hotel_night_pp":num,"total_2pax":num,"forecast":str,"temp_c":num,"escape_score":num,"vibe_tags":[str,str,str],"timing":{"signal":"book_now"|"wait_week"|"act_today","reason":str},"booking":{"flight_url":str,"flight_site":str}}]}`;
+
+const WEEKEND_P=`Find 6 weekend escapes from London departing this Friday after 18:30 returning Sunday 20:00-23:30. Include 1 Greek option.
+Return JSON:{"trips":[{"city":str,"country":str,"tagline":str,"transport_type":"flight"|"eurostar"|"train","is_greek":bool,"outbound":{"from":str,"departs":str,"arrives":str,"price_pp":num},"return":{"departs":str,"arrives":str,"price_pp":num},"hotel":{"name":str,"type":str,"neighbourhood":str,"price_per_night":num},"vibe_scores":{"romantic":7,"foodie":8,"aesthetic":7,"local_feel":7,"hidden_gem":6},"budget_2days":{"transport":num,"hotel":num,"food":num,"activities":num,"transport_local":num,"total":num},"escape_score":num,"why_this_weekend":str,"hidden_gem_tip":str,"top_vibes":[str,str,str],"timing":{"signal":"book_now"|"wait_week"|"act_today","confidence":85,"reason":str},"booking":{"flight_url":str,"flight_site":str,"hotel_url":str,"hotel_site":str}}]}`;
+
+const CUSTOM_P=(from,dest,dep,ret,pax,bgt)=>`Find 5 trips from ${from} to ${dest||"best destinations worldwide"}, depart ${dep}, return ${ret}, ${pax} travellers, max £${bgt}pp. Any day, any time, no restrictions.
+Return JSON:{"trips":[{"city":str,"country":str,"tagline":str,"transport_type":str,"is_greek":bool,"nights":num,"outbound":{"from":str,"departs":str,"arrives":str,"price_pp":num,"date":str},"return":{"departs":str,"arrives":str,"price_pp":num,"date":str},"hotel":{"name":str,"type":str,"neighbourhood":str,"price_per_night":num},"vibe_scores":{"romantic":7,"foodie":8,"aesthetic":7,"local_feel":7,"hidden_gem":6},"budget_total":{"transport":num,"hotel":num,"food":num,"activities":num,"transport_local":num,"total":num},"escape_score":num,"why_go":str,"hidden_gem_tip":str,"top_vibes":[str,str,str],"timing":{"signal":"book_now"|"wait_week"|"act_today","confidence":75,"reason":str},"booking":{"flight_url":str,"flight_site":str,"hotel_url":str,"hotel_site":str}}]}`;
+
+const MULTICITY_P=(cities,nights,bgt)=>`Plan a multi-city trip from London visiting: ${cities}. Total ${nights} nights. Budget £${bgt}pp all-in. Find the cheapest logical routing with open-jaw tickets where needed.
+Return JSON:{"trips":[{"route_label":str,"tagline":str,"cities":[{"city":str,"country":str,"nights":num,"highlights":[str,str],"hotel_pp_per_night":num}],"total_nights":num,"outbound":{"from":"LHR","departs":str,"price_pp":num},"return":{"arrives":"LHR","price_pp":num},"inter_city_flights_pp":num,"budget_total":{"transport":num,"hotel":num,"food":num,"activities":num,"total":num},"escape_score":num,"why_go":str,"timing":{"signal":"book_now"|"wait_week"|"act_today","reason":str},"booking":{"flight_url":str,"flight_site":str}}]}
+2-3 route options.`;
+
+const GREECE_P=`Find cheapest upcoming weekends London to Athens and Thessaloniki, next 8 weekends.
+Return JSON:{"athens":[{"weekend_label":str,"price_pp_return":num,"airline":str,"departs_fri":str,"returns_sun":str,"price_signal":"book_now"|"wait_week"|"act_today","hotel_avg_pp":num,"total_pp":num,"crowd_level":"low"|"medium"|"high","weather":str,"booking":{"flight_url":str,"flight_site":str}}],"thessaloniki":[same]}`;
+
+const SPECIAL_P=`Find 5 cheapest flight deals London to Athens or Thessaloniki for ANY weekend in next 12 months. No date restrictions — cheapest possible.
+Return JSON:{"deals":[{"city":str,"weekend_label":str,"depart_date":str,"price_pp_return":num,"airline":str,"departs_fri":str,"returns_sun":str,"total_pp_with_hotel":num,"why_cheap":str,"crowd_level":"low"|"medium"|"high","weather":str,"booking":{"flight_url":str,"flight_site":str,"hotel_url":str}}]}`;
+
+const LONGHAUL_P=`Find 5 cheapest 1-week trips from London outside Europe for 2 people. Any dates next 12 months. Best value including flights + hotel.
+Return JSON:{"trips":[{"city":str,"country":str,"continent":str,"tagline":str,"best_month":str,"outbound":{"from":"LHR","departs":str,"airline":str,"price_pp":num},"return":{"airline":str,"price_pp":num},"hotel":{"name":str,"type":str,"neighbourhood":str,"price_per_night":num},"nights":7,"vibe_scores":{"romantic":7,"foodie":8,"aesthetic":7,"local_feel":7,"hidden_gem":6},"budget_week":{"transport":num,"hotel":num,"food":num,"activities":num,"transport_local":num,"total":num},"escape_score":num,"why_go":str,"hidden_gem_tip":str,"top_vibes":[str,str,str],"timing":{"signal":"book_now"|"wait_week"|"act_today","reason":str},"booking":{"flight_url":str,"flight_site":str,"hotel_url":str,"hotel_site":str},"itinerary_highlights":[str,str,str,str,str]}]}`;
+
+const UK_P=`Find 6 best UK weekend destinations accessible by train from London. Hidden gems, not typical tourist spots. Friday evening departure, Sunday return.
+Return JSON:{"trips":[{"city":str,"region":str,"tagline":str,"train_from":"London Kings Cross"|"London Paddington"|"London St Pancras"|"London Waterloo"|"London Victoria","journey_time":str,"departs_fri":str,"returns_sun":str,"train_pp_return":num,"hotel":{"name":str,"type":str,"neighbourhood":str,"price_per_night":num},"vibe_scores":{"romantic":7,"foodie":7,"aesthetic":7,"local_feel":8,"hidden_gem":8},"budget_2days":{"transport":num,"hotel":num,"food":num,"activities":num,"total":num},"escape_score":num,"why_this_weekend":str,"hidden_gem_tip":str,"top_vibes":[str,str,str],"timing":{"signal":"book_now","reason":str},"booking":{"train_url":"https://www.trainline.com","hotel_url":str,"hotel_site":str}}]}`;
+
+const CALENDAR_P=(dest)=>`Generate a price calendar for flights London to ${dest} for all 12 months of the year. Show cheapest weeks and most expensive periods.
+Return JSON:{"destination":str,"months":[{"month":str,"month_num":num,"price_tier":"very_cheap"|"cheap"|"moderate"|"expensive"|"peak","avg_price_pp":num,"best_week":str,"crowd_level":"low"|"medium"|"high","weather":str,"tip":str}]}
+All 12 months.`;
+
+const ALGORITHM_P=`Give specific insider knowledge on best days/times to book flights to save money. Cover Ryanair, EasyJet, British Airways, Wizz Air, Eurostar.
+Return JSON:{"airlines":[{"name":str,"logo_emoji":str,"best_day_to_book":str,"best_time":str,"sale_pattern":str,"secret_tip":str,"avoid":str,"booking_url":str}],"general_tips":[str,str,str,str,str],"price_drop_windows":[{"window":str,"saving":str,"applies_to":str}]}`;
+
+const CURRENCY_P=(amount,cities)=>`Show the buying power of £${amount} in these cities: ${cities}. Be specific and vivid.
+Return JSON:{"amount_gbp":num,"cities":[{"city":str,"country":str,"currency":str,"exchange_rate":str,"hotel_nights":num,"restaurant_meals":num,"coffee_cups":num,"local_transport_days":num,"what_you_can_do":str,"value_rating":"exceptional"|"great"|"good"|"fair","emoji":str}]}`;
+
+const ALERTS_P=(route)=>`Analyse price timing for: ${route}.
+Return JSON:{"analysis":{"route":str,"current_price_pp":num,"historic_avg_pp":num,"lowest_seen_pp":num,"trend":"rising"|"falling"|"stable","signal":"book_now"|"wait_week"|"act_today","confidence":num,"recommendation":str,"reasons":[str,str,str],"airline_sales":str,"best_booking_window":str}}`;
 
 // ── AUTO HUNTER ───────────────────────────────────────────────────────────────
-function AutoHunterTab({onSelect}){
-  const [weekends,setWeekends]=useState([]);const [loading,setLoading]=useState(false);const [err,setErr]=useState("");const [lastScan,setLastScan]=useState(null);const [expanded,setExpanded]=useState(0);const [autoScan,setAutoScan]=useState(false);const autoRef=useRef(null);
-  async function hunt(){setLoading(true);setErr("");try{const d=await ai(HUNTER_P,3500);setWeekends(d.weekends||[]);setLastScan(new Date());setExpanded(0);}catch(e){setErr(e.message);}setLoading(false);}
-  useEffect(()=>{hunt();},[]);
-  useEffect(()=>{if(autoRef.current)clearInterval(autoRef.current);if(autoScan){autoRef.current=setInterval(()=>hunt(),120000);}return()=>clearInterval(autoRef.current);},[autoScan]);
-  const VS={great:{label:"Best Value 🎯",color:C.green,soft:C.greenSoft},good:{label:"Good Value",color:C.blue,soft:C.blueSoft},fair:{label:"Fair Value",color:C.amber,soft:C.amberSoft}};
+function HuntTab({onSelect}){
+  const [sub,setSub]=useState("auto");
+  const [wks,setWks]=useState([]);const [wkL,setWkL]=useState(false);const [wkE,setWkE]=useState("");const [exp,setExp]=useState(0);const [autoScan,setAutoScan]=useState(false);const [last,setLast]=useState(null);const [filter,setFilter]=useState("all");
+  const [spont,setSpont]=useState([]);const [spL,setSpL]=useState(false);const [spE,setSpE]=useState("");const [spLoaded,setSpLoaded]=useState(false);
+  const [wnd,setWnd]=useState([]);const [wndL,setWndL]=useState(false);const [wndE,setWndE]=useState("");const [weather,setWeather]=useState("sunny 20°C+");const [wBudget,setWBudget]=useState(400);
+  const autoRef=useRef(null);
+
+  async function huntAuto(){setWkL(true);setWkE("");try{const d=await ai(HUNTER_P,5000);setWks(d.weekends||[]);setLast(new Date());setExp(0);}catch(e){setWkE(e.message);}setWkL(false);}
+  async function huntSpont(){setSpL(true);setSpE("");setSpLoaded(true);try{const d=await ai(SPONTANEOUS_P,2500);setSpont(d.deals||[]);}catch(e){setSpE(e.message);}setSpL(false);}
+  async function huntWeather(){setWndL(true);setWndE("");try{const d=await ai(WEATHER_P(weather,wBudget),2500);setWnd(d.windows||[]);}catch(e){setWndE(e.message);}setWndL(false);}
+  useEffect(()=>{huntAuto();},[]);
+  useEffect(()=>{if(autoRef.current)clearInterval(autoRef.current);if(autoScan){autoRef.current=setInterval(()=>huntAuto(),120000);}return()=>clearInterval(autoRef.current);},[autoScan]);
+  useEffect(()=>{if(sub==="spontaneous"&&!spLoaded)huntSpont();},[sub]);
+
+  const VS={great:{l:"Best Value 🎯",c:C.green,s:C.greenSoft},good:{l:"Good Value",c:C.blue,s:C.blueSoft},fair:{l:"Fair Value",c:C.amber,s:C.amberSoft}};
+  const filtered=filter==="budget"?wks.filter(w=>w.is_budget):wks;
+  const inp={background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,padding:"10px 14px",fontSize:13,fontFamily:C.sans,width:"100%",boxSizing:"border-box"};
+
   return(<div style={{padding:"20px 16px"}}>
-    <div style={{marginBottom:20}}>
-      <div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>Auto-Hunter</div>
-      <div style={{fontSize:13,color:C.muted,fontFamily:C.sans,marginBottom:12}}>Finds cheapest weekends automatically</div>
-      <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-        <button onClick={hunt} disabled={loading} style={{fontSize:12,fontFamily:C.sans,fontWeight:600,background:C.text,color:C.bg,border:"none",borderRadius:20,padding:"8px 18px",cursor:"pointer",opacity:loading?0.5:1}}>{loading?"Scanning...":"↺ Scan Now"}</button>
+    <div style={{marginBottom:16}}>
+      <div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>Hunt</div>
+      <div style={{fontSize:13,color:C.muted,fontFamily:C.sans,marginBottom:14}}>Find your next escape</div>
+      <SubTabs tabs={[["auto","🎯 Auto"],["spontaneous","⚡ Now!"],["weather","🌤 Weather"]]} active={sub} onSelect={setSub}/>
+    </div>
+
+    {sub==="auto"&&<div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",marginBottom:12}}>
+        <button onClick={huntAuto} disabled={wkL} style={{fontSize:12,fontFamily:C.sans,fontWeight:600,background:C.text,color:C.bg,border:"none",borderRadius:20,padding:"8px 18px",cursor:"pointer",opacity:wkL?0.5:1}}>{wkL?"Scanning...":"↺ Scan Now"}</button>
         <div style={{display:"flex",alignItems:"center",gap:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:"6px 14px",cursor:"pointer"}} onClick={()=>setAutoScan(p=>!p)}>
-          <div style={{width:32,height:18,background:autoScan?C.green:C.border,borderRadius:99,position:"relative",transition:"background 0.2s"}}><div style={{width:14,height:14,background:"#fff",borderRadius:"50%",position:"absolute",top:2,left:autoScan?16:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/></div>
+          <div style={{width:32,height:18,background:autoScan?C.green:C.border,borderRadius:99,position:"relative",transition:"background .2s"}}><div style={{width:14,height:14,background:"#fff",borderRadius:"50%",position:"absolute",top:2,left:autoScan?16:2,transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/></div>
           <span style={{fontSize:12,color:autoScan?C.green:C.muted,fontFamily:C.sans,fontWeight:500}}>Auto-scan</span>
         </div>
-        {lastScan&&<span style={{fontSize:11,color:C.dim,fontFamily:C.sans}}>{lastScan.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span>}
+        {last&&<span style={{fontSize:11,color:C.dim,fontFamily:C.sans}}>{last.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span>}
       </div>
-    </div>
-    {loading&&<Loader text="Hunting cheapest weekends..." sub="Scanning flights · hotels · weather across Europe"/>}
-    {err&&<ErrBox msg={err} onRetry={hunt}/>}
-    {!loading&&!err&&weekends.map((wk,wi)=>{
-      const vs=VS[wk.value_tier]||VS.good;const isOpen=expanded===wi;
-      return(<div key={wi} style={{marginBottom:14}}>
-        <div onClick={()=>setExpanded(isOpen?-1:wi)} style={{background:C.card,border:`1px solid ${isOpen?C.borderHover:C.border}`,borderRadius:isOpen?"14px 14px 0 0":14,padding:"16px 18px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div><div style={{fontSize:13,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>{wk.label}</div><div style={{fontSize:12,color:C.muted,fontFamily:C.sans,marginBottom:6}}>{wk.why_cheap}</div><Badge label={vs.label} color={vs.color} soft={vs.soft} small/></div>
-          <div style={{textAlign:"right",flexShrink:0,marginLeft:16}}><div style={{fontSize:22,fontFamily:C.serif,color:vs.color,fontWeight:500}}>£{wk.cheapest_total_2pax}</div><div style={{fontSize:10,color:C.dim,fontFamily:C.sans}}>from · 2 ppl</div><div style={{fontSize:18,color:C.dim,marginTop:4}}>{isOpen?"▲":"▼"}</div></div>
-        </div>
-        {isOpen&&(<div style={{border:`1px solid ${C.borderHover}`,borderTop:"none",borderRadius:"0 0 14px 14px",overflow:"hidden"}}>
-          {(wk.destinations||[]).map((dest,di)=>{
-            const isBest=di===0;const tm=TIMING_MAP[dest.timing?.signal];
-            return(<div key={di} onClick={()=>onSelect(huntToTrip(dest,wk))} style={{background:isBest?C.greenSoft:C.bg,borderTop:di>0?`1px solid ${C.border}`:"none",padding:"16px 18px",cursor:"pointer"}}
-              onMouseEnter={e=>e.currentTarget.style.background=isBest?"#d1fae5":"#EDE8DF"}
-              onMouseLeave={e=>e.currentTarget.style.background=isBest?C.greenSoft:C.bg}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div style={{flex:1,marginRight:12}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
-                    <span>{TICON[dest.transport_type]||"✈"}</span><span style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{dest.from_airport}</span>
-                    {isBest&&<Badge label="Cheapest" color={C.green} soft={C.greenSoft} small/>}
-                    {dest.is_greek&&<Badge label="🇬🇷" color={C.amber} soft={C.amberSoft} small/>}
+      <div style={{display:"flex",gap:6,marginBottom:16}}>
+        {[["all","All 15"],["budget","💚 Under £500"]].map(([k,l])=><button key={k} onClick={()=>setFilter(k)} style={{fontSize:11,borderRadius:20,padding:"5px 12px",cursor:"pointer",fontFamily:C.sans,fontWeight:500,border:"1px solid",borderColor:filter===k?C.green:C.border,color:filter===k?C.green:C.muted,background:filter===k?C.greenSoft:C.card}}>{l}</button>)}
+      </div>
+      {wkL&&<Spin text="Hunting 15 cheapest escapes..." sub="Scanning flights across 6 months"/>}
+      {wkE&&<Err msg={wkE} retry={huntAuto}/>}
+      {!wkL&&!wkE&&filtered.map((wk,wi)=>{
+        const vs=VS[wk.value_tier]||VS.good,isOpen=exp===wi;
+        return(<div key={wi} style={{marginBottom:14}}>
+          <div onClick={()=>setExp(isOpen?-1:wi)} style={{background:C.card,border:`1px solid ${isOpen?C.borderHover:C.border}`,borderRadius:isOpen?"14px 14px 0 0":14,padding:"16px 18px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div><div style={{display:"flex",gap:6,alignItems:"center",marginBottom:4}}><div style={{fontSize:13,fontFamily:C.serif,fontStyle:"italic",color:C.text}}>{wk.label}</div>{wk.is_budget&&<Badge l="Under £500" c={C.green} s={C.greenSoft} sm/>}</div><div style={{fontSize:12,color:C.muted,fontFamily:C.sans,marginBottom:6}}>{wk.why_cheap}</div><Badge l={vs.l} c={vs.c} s={vs.s} sm/></div>
+            <div style={{textAlign:"right",flexShrink:0,marginLeft:16}}><div style={{fontSize:22,fontFamily:C.serif,color:vs.c,fontWeight:500}}>£{wk.cheapest_total_2pax}</div><div style={{fontSize:10,color:C.dim,fontFamily:C.sans}}>from · 2 ppl</div><div style={{fontSize:18,color:C.dim,marginTop:4}}>{isOpen?"▲":"▼"}</div></div>
+          </div>
+          {isOpen&&<div style={{border:`1px solid ${C.borderHover}`,borderTop:"none",borderRadius:"0 0 14px 14px",overflow:"hidden"}}>
+            {(wk.destinations||[]).map((dest,di)=>{
+              const isBest=di===0,tm=TM[dest.timing?.signal];
+              const trip={city:dest.city,country:dest.country,tagline:dest.one_liner,transport_type:dest.transport_type,is_greek:dest.is_greek,nights:2,outbound:{from:dest.from_airport,departs:dest.departs_fri,arrives:dest.arrives_city,price_pp:dest.flight_pp},return:{departs:dest.returns_sun,arrives:dest.arrives_london,price_pp:dest.flight_pp},hotel:{name:`${dest.city} boutique hotel`,type:"boutique",neighbourhood:"City centre",price_per_night:dest.hotel_night_pp*2},vibe_scores:{romantic:7,foodie:7,aesthetic:7,local_feel:7,hidden_gem:7},budget_2days:{transport:dest.flight_pp*4,hotel:dest.hotel_night_pp*4,food:Math.round(dest.total_2pax*.2),activities:Math.round(dest.total_2pax*.1),transport_local:Math.round(dest.total_2pax*.05),total:dest.total_2pax},escape_score:dest.escape_score,why_go:dest.one_liner,hidden_gem_tip:"",top_vibes:dest.vibe_tags||[],timing:dest.timing,booking:dest.booking};
+              return(<div key={di} onClick={()=>onSelect(trip)} style={{background:isBest?C.greenSoft:C.bg,borderTop:di>0?`1px solid ${C.border}`:"none",padding:"16px 18px",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=isBest?"#d1fae5":"#EDE8DF"} onMouseLeave={e=>e.currentTarget.style.background=isBest?C.greenSoft:C.bg}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div style={{flex:1,marginRight:12}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}><span>{TI[dest.transport_type]||"✈"}</span><span style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{dest.from_airport}</span>{isBest&&<Badge l="Cheapest" c={C.green} s={C.greenSoft} sm/>}{dest.is_greek&&<Badge l="🇬🇷" c={C.amber} s={C.amberSoft} sm/>}</div>
+                    <div style={{fontSize:20,fontFamily:C.serif,fontStyle:"italic",color:C.text,lineHeight:1.1,marginBottom:2}}>{dest.city}</div>
+                    <div style={{fontSize:11,color:C.muted,fontFamily:C.sans,marginBottom:4}}>{dest.country}</div>
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:4}}>{(dest.vibe_tags||[]).map((v2,i)=><span key={i} style={{fontSize:10,color:C.muted,background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:"2px 8px",fontFamily:C.sans}}>{v2}</span>)}</div>
                   </div>
-                  <div style={{fontSize:20,fontFamily:C.serif,fontStyle:"italic",color:C.text,lineHeight:1.1,marginBottom:2}}>{dest.city}</div>
-                  <div style={{fontSize:11,color:C.muted,fontFamily:C.sans,marginBottom:6}}>{dest.country}</div>
-                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>{(dest.vibe_tags||[]).map((v,i)=>(<span key={i} style={{fontSize:10,color:C.muted,background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:"2px 8px",fontFamily:C.sans}}>{v}</span>))}</div>
-                  <div style={{fontSize:11,color:C.muted,fontFamily:C.sans,fontStyle:"italic"}}>{dest.one_liner}</div>
+                  <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:22,fontFamily:C.serif,color:C.text,fontWeight:500}}>£{dest.total_2pax}</div><div style={{fontSize:10,color:C.dim,fontFamily:C.sans,marginBottom:4}}>2 people</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans,marginBottom:4}}>✈ £{dest.flight_pp}pp</div>{tm&&<Badge l={tm.l} c={tm.c} s={tm.s} sm/>}</div>
                 </div>
-                <div style={{textAlign:"right",flexShrink:0}}>
-                  <div style={{fontSize:22,fontFamily:C.serif,color:C.text,fontWeight:500}}>£{dest.total_2pax}</div>
-                  <div style={{fontSize:10,color:C.dim,fontFamily:C.sans,marginBottom:6}}>2 people</div>
-                  <div style={{fontSize:11,color:C.muted,fontFamily:C.sans,marginBottom:6}}>✈ £{dest.flight_pp}pp</div>
-                  {tm&&<Badge label={tm.label} color={tm.color} soft={tm.soft} small/>}
+                <div style={{marginTop:8,borderTop:`1px solid ${C.border}`,paddingTop:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{dest.departs_fri} → {dest.arrives_city} · back {dest.returns_sun}</span>
+                  <div style={{display:"flex",gap:6}}>{dest.booking?.flight_url&&<button onClick={e=>{e.stopPropagation();go(dest.booking.flight_url);}} style={{fontSize:10,background:C.blue,color:"#fff",border:"none",borderRadius:12,padding:"4px 10px",cursor:"pointer",fontFamily:C.sans}}>✈ Book</button>}<span style={{fontSize:11,color:C.blue,fontFamily:C.sans,fontWeight:500}}>Details →</span></div>
                 </div>
-              </div>
-              <div style={{marginTop:8,borderTop:`1px solid ${C.border}`,paddingTop:8,display:"flex",justifyContent:"space-between"}}>
-                <span style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{dest.departs_fri} → {dest.arrives_city} · back {dest.returns_sun}</span>
-                <span style={{fontSize:11,color:C.blue,fontFamily:C.sans,fontWeight:500}}>Details →</span>
-              </div>
-            </div>);
-          })}
+              </div>);
+            })}
+          </div>}
+        </div>);
+      })}
+    </div>}
+
+    {sub==="spontaneous"&&<div>
+      <div style={{background:"#FEF2F2",border:`1px solid ${C.red}33`,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:C.red,fontFamily:C.sans,lineHeight:1.6}}>⚡ Last-minute deals departing TODAY or TOMORROW. Airlines cut prices drastically to fill seats!</div>
+      <button onClick={huntSpont} disabled={spL} style={{fontSize:12,fontFamily:C.sans,fontWeight:600,background:C.red,color:"#fff",border:"none",borderRadius:20,padding:"8px 18px",cursor:"pointer",opacity:spL?0.5:1,marginBottom:16}}>{spL?"Scanning...":"↺ Refresh Deals"}</button>
+      {spL&&<Spin text="Hunting last-minute deals..." sub="Checking today's unsold seats..."/>}
+      {spE&&<Err msg={spE} retry={huntSpont}/>}
+      {!spL&&!spE&&spont.map((deal,i)=>{
+        const trip={city:deal.city,country:deal.country,tagline:deal.why_cheap,transport_type:"flight",nights:2,outbound:{from:deal.airport_from,departs:deal.departs,arrives:deal.arrives,price_pp:deal.price_pp},return:{departs:deal.returns,price_pp:deal.price_pp},hotel:{name:`${deal.city} hotel`,type:"boutique",neighbourhood:"Centre",price_per_night:deal.hotel_night_pp*2},vibe_scores:{romantic:7,foodie:7,aesthetic:7,local_feel:7,hidden_gem:7},budget_2days:{transport:deal.price_pp*4,hotel:deal.hotel_night_pp*4,food:60,activities:40,transport_local:20,total:deal.total_with_hotel},escape_score:deal.escape_score,why_go:deal.why_cheap,top_vibes:deal.vibe_tags||[],timing:deal.timing,booking:deal.booking};
+        return(<div key={i} style={{background:C.card,borderRadius:16,border:`2px solid ${C.red}33`,overflow:"hidden",marginBottom:12}}>
+          <div style={{height:4,background:C.red}}/>
+          <div style={{padding:"16px 18px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+              <div><div style={{fontSize:20,fontFamily:C.serif,fontStyle:"italic",color:C.text}}>{deal.city}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{deal.country} · {deal.airline} from {deal.airport_from}</div></div>
+              <div style={{textAlign:"right"}}><div style={{fontSize:22,fontFamily:C.serif,color:C.red,fontWeight:500}}>£{deal.total_2pax}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>2 people flights</div></div>
+            </div>
+            <div style={{background:C.redSoft,borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:12,color:C.red,fontFamily:C.sans}}>{deal.why_cheap}</div>
+            <div style={{fontSize:11,color:C.muted,fontFamily:C.sans,marginBottom:10}}>✈ {deal.departs} → {deal.arrives} · Back {deal.returns} · Total with hotel: £{deal.total_with_hotel}</div>
+            <div style={{display:"flex",gap:8}}>
+              {deal.booking?.flight_url&&<button onClick={()=>go(deal.booking.flight_url)} style={{fontSize:11,fontFamily:C.sans,fontWeight:600,background:C.red,color:"#fff",border:"none",borderRadius:20,padding:"7px 16px",cursor:"pointer"}}>⚡ Book Now</button>}
+              <button onClick={()=>onSelect(trip)} style={{fontSize:11,fontFamily:C.sans,fontWeight:500,background:"none",border:`1px solid ${C.border}`,borderRadius:20,padding:"7px 16px",cursor:"pointer",color:C.muted}}>Details</button>
+            </div>
+          </div>
+        </div>);
+      })}
+    </div>}
+
+    {sub==="weather"&&<div>
+      <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:16,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:12,color:C.dim,fontFamily:C.sans,marginBottom:10}}>What weather do you want?</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+          {[["☀️ Hot & Sunny","sunny 25°C+"],["🌤 Warm & Mild","warm mild 18-23°C"],["❄️ Winter Sun","winter sun 15°C+"],["🌸 Spring Vibes","spring 14-20°C"]].map(([l,v2])=><button key={v2} onClick={()=>setWeather(v2)} style={{fontSize:11,borderRadius:10,padding:"8px 6px",cursor:"pointer",fontFamily:C.sans,border:"1px solid",borderColor:weather===v2?C.blue:C.border,color:weather===v2?C.blue:C.muted,background:weather===v2?C.blueSoft:C.bg}}>{l}</button>)}
+        </div>
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:10,color:C.dim,fontFamily:C.sans,marginBottom:6}}>MAX BUDGET · £{wBudget} for 2 people</div>
+          <input type="range" min={200} max={800} step={25} value={wBudget} onChange={e=>setWBudget(+e.target.value)} style={{width:"100%"}}/>
+        </div>
+        <button onClick={huntWeather} disabled={wndL} style={{width:"100%",background:C.teal,border:"none",borderRadius:12,color:"#fff",padding:"12px",fontSize:13,fontFamily:C.sans,fontWeight:600,cursor:"pointer",opacity:wndL?0.5:1}}>{wndL?"Searching...":"Find Weather Windows →"}</button>
+      </div>
+      {wndL&&<Spin text="Finding perfect weather windows..." sub="Cross-referencing forecasts + prices"/>}
+      {wndE&&<Err msg={wndE} retry={huntWeather}/>}
+      {!wndL&&!wndE&&wnd.map((w,i)=>{
+        const trip={city:w.city,country:w.country,tagline:`${w.forecast} · ${w.temp_c}°C`,transport_type:w.transport_type||"flight",nights:2,outbound:{from:w.from_airport,departs:w.departs_fri,price_pp:w.flight_pp},return:{departs:w.returns_sun,price_pp:w.flight_pp},hotel:{name:`${w.city} hotel`,type:"boutique",neighbourhood:"Centre",price_per_night:w.hotel_night_pp*2},vibe_scores:{romantic:7,foodie:7,aesthetic:7,local_feel:7,hidden_gem:7},budget_2days:{transport:w.flight_pp*4,hotel:w.hotel_night_pp*4,food:60,activities:40,transport_local:20,total:w.total_2pax},escape_score:w.escape_score,why_go:`${w.forecast}. Perfect weather window this weekend.`,top_vibes:w.vibe_tags||[],timing:w.timing,booking:w.booking};
+        return(<div key={i} style={{background:C.card,borderRadius:14,border:`1px solid ${C.border}`,padding:"16px 18px",marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+            <div><div style={{fontSize:18,fontFamily:C.serif,fontStyle:"italic",color:C.text}}>{w.city}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{w.country} · {w.weekend_label}</div></div>
+            <div style={{textAlign:"right"}}><div style={{fontSize:20,fontFamily:C.serif,color:C.teal,fontWeight:500}}>£{w.total_2pax}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>2 ppl</div></div>
+          </div>
+          <div style={{background:C.tealSoft,borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:12,color:C.teal,fontFamily:C.sans}}>{w.temp_c}°C · {w.forecast}</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>{(w.vibe_tags||[]).map((v2,i2)=><span key={i2} style={{fontSize:11,color:C.muted,background:C.bg,border:`1px solid ${C.border}`,borderRadius:20,padding:"3px 9px",fontFamily:C.sans}}>{v2}</span>)}</div>
+          <div style={{display:"flex",gap:8}}>
+            {w.booking?.flight_url&&<button onClick={()=>go(w.booking.flight_url)} style={{fontSize:11,fontFamily:C.sans,fontWeight:600,background:C.teal,color:"#fff",border:"none",borderRadius:20,padding:"6px 14px",cursor:"pointer"}}>✈ Book</button>}
+            <button onClick={()=>onSelect(trip)} style={{fontSize:11,fontFamily:C.sans,color:C.muted,background:"none",border:`1px solid ${C.border}`,borderRadius:20,padding:"6px 14px",cursor:"pointer"}}>Details</button>
+          </div>
+        </div>);
+      })}
+    </div>}
+  </div>);
+}
+
+// ── PLAN TAB ──────────────────────────────────────────────────────────────────
+function PlanTab({onSelect}){
+  const [sub,setSub]=useState("weekend");
+  const [trips,setTrips]=useState([]);const [tL,setTL]=useState(true);const [tE,setTE]=useState("");const [airports,setAirports]=useState(["LHR","LGW","LCY"]);
+  const [cf,setCf]=useState({from:"LHR",dest:"",depart:new Date().toISOString().split("T")[0],ret:"",pax:2,bgt:1500});
+  const [ctrips,setCtrips]=useState([]);const [cL,setCL]=useState(false);const [cE,setCE]=useState("");const [cdone,setCdone]=useState(false);
+  const [mCities,setMCities]=useState("");const [mNights,setMNights]=useState(10);const [mBgt,setMBgt]=useState(2000);
+  const [mtrips,setMtrips]=useState([]);const [mL,setML]=useState(false);const [mE,setME]=useState("");const [mdone,setMdone]=useState(false);
+  const setc=(k,v)=>setCf(p=>({...p,[k]:v}));
+  useEffect(()=>{if(sub==="weekend")loadWk();},[]);
+  async function loadWk(){setTL(true);setTE("");try{const d=await ai(WEEKEND_P+` Airports: ${airports.join(",")}`);setTrips(d.trips||[]);}catch(e){setTE(e.message);}setTL(false);}
+  async function searchCustom(){if(!cf.depart||!cf.ret)return;setCL(true);setCdone(true);setCE("");try{const d=await ai(CUSTOM_P(cf.from,cf.dest,cf.depart,cf.ret,cf.pax,cf.bgt));setCtrips(d.trips||[]);}catch(e){setCE(e.message);}setCL(false);}
+  async function searchMulti(){if(!mCities)return;setML(true);setMdone(true);setME("");try{const d=await ai(MULTICITY_P(mCities,mNights,mBgt),3000);setMtrips(d.trips||[]);}catch(e){setME(e.message);}setML(false);}
+  const inp={background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,padding:"12px 14px",fontSize:13,fontFamily:C.sans,width:"100%",boxSizing:"border-box"};
+
+  return(<div style={{padding:"20px 16px"}}>
+    <div style={{marginBottom:16}}><div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>Plan</div><div style={{fontSize:13,color:C.muted,fontFamily:C.sans,marginBottom:14}}>Weekend · Custom dates · Multi-city</div>
+    <SubTabs tabs={[["weekend","✈ Weekend"],["custom","📅 Custom"],["multi","🗺 Multi-City"]]} active={sub} onSelect={setSub} color={C.blue}/></div>
+
+    {sub==="weekend"&&<div>
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+        {["LHR","LGW","LCY","STN"].map(ap=><button key={ap} onClick={()=>setAirports(p=>p.includes(ap)?p.filter(x=>x!==ap):[...p,ap])} style={{fontSize:11,borderRadius:20,padding:"5px 12px",cursor:"pointer",fontFamily:C.sans,fontWeight:500,border:"1px solid",borderColor:airports.includes(ap)?C.blue:C.border,color:airports.includes(ap)?C.blue:C.muted,background:airports.includes(ap)?C.blueSoft:C.card}}>{ap}</button>)}
+        <button onClick={loadWk} style={{marginLeft:"auto",fontSize:11,borderRadius:20,padding:"5px 14px",cursor:"pointer",fontFamily:C.sans,border:`1px solid ${C.border}`,color:C.muted,background:C.card}}>↺</button>
+      </div>
+      {tL&&<Spin text="Scanning this weekend..." sub="Flights · hotels · vibe scores"/>}
+      {tE&&<Err msg={tE} retry={loadWk}/>}
+      {!tL&&!tE&&trips.map((t,i)=><TCard key={i} trip={t} onSelect={onSelect}/>)}
+    </div>}
+
+    {sub==="custom"&&<div>
+      <div style={{background:C.card,borderRadius:16,padding:20,marginBottom:20,border:`1px solid ${C.border}`}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+          <div><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>From</div><select value={cf.from} onChange={e=>setc("from",e.target.value)} style={inp}>{["LHR","LGW","LCY","STN","St Pancras","Manchester","Birmingham"].map(a=><option key={a}>{a}</option>)}</select></div>
+          <div><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>To</div><input value={cf.dest} onChange={e=>setc("dest",e.target.value)} placeholder="Anywhere..." style={inp}/></div>
+          <div><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Depart</div><input type="date" value={cf.depart} onChange={e=>setc("depart",e.target.value)} style={inp}/></div>
+          <div><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Return</div><input type="date" value={cf.ret} onChange={e=>setc("ret",e.target.value)} style={inp}/></div>
+        </div>
+        <div style={{marginBottom:12}}><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Travellers · {cf.pax}</div><input type="range" min={1} max={8} value={cf.pax} onChange={e=>setc("pax",+e.target.value)} style={{width:"100%"}}/></div>
+        <div style={{marginBottom:16}}><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Max budget pp · £{cf.bgt}</div><input type="range" min={200} max={8000} step={50} value={cf.bgt} onChange={e=>setc("bgt",+e.target.value)} style={{width:"100%"}}/></div>
+        <button onClick={searchCustom} disabled={!cf.depart||!cf.ret} style={{width:"100%",background:!cf.depart||!cf.ret?C.border:C.blue,border:"none",borderRadius:12,color:!cf.depart||!cf.ret?C.muted:"#fff",padding:"14px",fontSize:14,fontFamily:C.sans,fontWeight:600,cursor:"pointer"}}>Find Best Options →</button>
+      </div>
+      {cL&&<Spin text="Finding your perfect trip..." sub="Comparing destinations · prices · timing"/>}
+      {cE&&<Err msg={cE} retry={searchCustom}/>}
+      {!cL&&!cE&&cdone&&ctrips.length===0&&<div style={{textAlign:"center",padding:"32px 0",color:C.muted,fontFamily:C.serif,fontStyle:"italic"}}>No results — try adjusting dates</div>}
+      {!cL&&!cE&&ctrips.map((t,i)=><TCard key={i} trip={t} onSelect={onSelect}/>)}
+    </div>}
+
+    {sub==="multi"&&<div>
+      <div style={{background:C.card,borderRadius:16,padding:20,marginBottom:20,border:`1px solid ${C.border}`}}>
+        <div style={{marginBottom:14}}><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Cities / Countries to visit</div><input value={mCities} onChange={e=>setMCities(e.target.value)} placeholder="e.g. Japan, Vietnam, Thailand" style={inp}/><div style={{fontSize:10,color:C.dim,fontFamily:C.sans,marginTop:5}}>Separate with commas</div></div>
+        <div style={{marginBottom:12}}><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Total nights · {mNights}</div><input type="range" min={5} max={30} value={mNights} onChange={e=>setMNights(+e.target.value)} style={{width:"100%"}}/></div>
+        <div style={{marginBottom:16}}><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Budget pp · £{mBgt}</div><input type="range" min={500} max={10000} step={100} value={mBgt} onChange={e=>setMBgt(+e.target.value)} style={{width:"100%"}}/></div>
+        <button onClick={searchMulti} disabled={!mCities||mL} style={{width:"100%",background:!mCities?C.border:C.violet,border:"none",borderRadius:12,color:!mCities?C.muted:"#fff",padding:"14px",fontSize:14,fontFamily:C.sans,fontWeight:600,cursor:"pointer"}}>{mL?"Building routes...":"Build Multi-City Route →"}</button>
+      </div>
+      {mL&&<Spin text="Building your multi-city route..." sub="Finding cheapest logical routing..."/>}
+      {mE&&<Err msg={mE} retry={searchMulti}/>}
+      {!mL&&!mE&&mdone&&mtrips.length===0&&<div style={{textAlign:"center",padding:"32px 0",color:C.muted,fontFamily:C.serif,fontStyle:"italic"}}>No routes found — try different cities</div>}
+      {!mL&&!mE&&mtrips.map((t,i)=>{
+        const trip2={city:t.cities?.[0]?.city||"Multi-City",country:(t.cities||[]).map(c=>c.country).join(" → "),tagline:t.route_label,transport_type:"flight",nights:t.total_nights||mNights,outbound:{from:"LHR",departs:t.outbound?.departs,price_pp:t.outbound?.price_pp},return:{price_pp:t.return?.price_pp},hotel:{name:"Multiple hotels",type:"boutique",neighbourhood:"Various",price_per_night:Math.round((t.budget_total?.hotel||0)/((t.total_nights||mNights)*2))},vibe_scores:{romantic:7,foodie:8,aesthetic:7,local_feel:7,hidden_gem:8},budget_total:t.budget_total,escape_score:t.escape_score,why_go:t.why_go,top_vibes:(t.cities||[]).slice(0,3).map(c=>c.city),timing:t.timing,booking:t.booking,itinerary_highlights:(t.cities||[]).map(c=>`${c.city} (${c.nights}n)`)};
+        return(<div key={i}>
+          <TCard trip={trip2} onSelect={onSelect} accent={C.violet}/>
+        </div>);
+      })}
+    </div>}
+  </div>);
+}
+
+// ── ESCAPES TAB ───────────────────────────────────────────────────────────────
+function EscapesTab({onSelect}){
+  const [sub,setSub]=useState("athens");
+  const [reg,setReg]=useState(null);const [regL,setRegL]=useState(true);const [regE,setRegE]=useState("");
+  const [spec,setSpec]=useState([]);const [spL,setSpL]=useState(false);const [spE,setSpE]=useState("");const [spLoaded,setSpLoaded]=useState(false);
+  const [lh,setLh]=useState([]);const [lhL,setLhL]=useState(false);const [lhE,setLhE]=useState("");const [lhLoaded,setLhLoaded]=useState(false);
+  const [uk,setUk]=useState([]);const [ukL,setUkL]=useState(false);const [ukE,setUkE]=useState("");const [ukLoaded,setUkLoaded]=useState(false);
+  useEffect(()=>{ai(GREECE_P).then(d=>setReg(d)).catch(e=>setRegE(e.message)).finally(()=>setRegL(false));},[]);
+  useEffect(()=>{if(sub==="special"&&!spLoaded){setSpL(true);setSpLoaded(true);ai(SPECIAL_P,2000).then(d=>setSpec(d.deals||[])).catch(e=>setSpE(e.message)).finally(()=>setSpL(false));}if(sub==="longhaul"&&!lhLoaded){setLhL(true);setLhLoaded(true);ai(LONGHAUL_P,4000).then(d=>setLh(d.trips||[])).catch(e=>setLhE(e.message)).finally(()=>setLhL(false));}if(sub==="uk"&&!ukLoaded){setUkL(true);setUkLoaded(true);ai(UK_P,2500).then(d=>setUk(d.trips||[])).catch(e=>setUkE(e.message)).finally(()=>setUkL(false));}},[sub]);
+  const rows=reg?.[sub==="athens"?"athens":"thessaloniki"]||[];
+  const CROWD={low:C.green,medium:C.amber,high:C.red};
+
+  return(<div style={{padding:"20px 16px"}}>
+    <div style={{marginBottom:16}}><div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>Escapes</div><div style={{fontSize:13,color:C.muted,fontFamily:C.sans,marginBottom:14}}>Greece · Special · Long Haul · UK</div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:0}}>{[["athens","🏛 Athens"],["thessaloniki","🌊 Thessaloniki"],["special","⚡ Special Deals"],["longhaul","🌍 Long Haul"],["uk","🏴󠁧󠁢󠁥󠁮󠁧󠁿 UK Gems"]].map(([k,l])=><button key={k} onClick={()=>setSub(k)} style={{padding:"10px",borderRadius:12,cursor:"pointer",fontSize:11,fontFamily:C.sans,fontWeight:500,border:`1px solid ${sub===k?C.amber+"66":C.border}`,background:sub===k?C.amberSoft:C.card,color:sub===k?C.amber:C.muted}}>{l}</button>)}</div></div>
+    <div style={{marginTop:16}}>
+    {(sub==="athens"||sub==="thessaloniki")&&<div>
+      {regL&&<Spin text="Scanning Greek escape windows..." sub="Next 8 weekends"/>}
+      {regE&&<Err msg={regE} retry={()=>{setRegL(true);ai(GREECE_P).then(d=>{setReg(d);setRegE("");}).catch(e=>setRegE(e.message)).finally(()=>setRegL(false));}}/>}
+      {!regL&&!regE&&rows.map((r,i)=>{const tm=TM[r.price_signal];return(<div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",marginBottom:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}><div><div style={{fontSize:15,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:2}}>{r.weekend_label}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{r.airline} · Fri {r.departs_fri} → Sun {r.returns_sun}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:20,fontFamily:C.serif,color:C.amber,fontWeight:500}}>£{r.price_pp_return}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>pp return</div></div></div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><span style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{r.weather}</span><span style={{fontSize:11,color:CROWD[r.crowd_level]||C.muted,fontFamily:C.sans}}>● {r.crowd_level} crowds</span><span style={{fontSize:12,color:C.text,fontFamily:C.sans,fontWeight:500}}>£{r.total_pp}pp total</span></div>{tm&&<Badge l={tm.l} c={tm.c} s={tm.s} sm/>}</div>
+        {r.booking?.flight_url&&<button onClick={()=>go(r.booking.flight_url)} style={{marginTop:10,fontSize:11,fontFamily:C.sans,fontWeight:600,background:C.blue,color:"#fff",border:"none",borderRadius:20,padding:"5px 14px",cursor:"pointer"}}>✈ Book on {r.booking.flight_site||"Skyscanner"}</button>}
+      </div>);})}
+    </div>}
+
+    {sub==="special"&&<div>
+      <div style={{background:C.amberSoft,border:`1px solid ${C.amber}33`,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:C.amber,fontFamily:C.sans}}>⚡ 5 φθηνότερα deals για Αθήνα/Θεσσαλονίκη — οποιοδήποτε Σ/Κ του χρόνου</div>
+      {spL&&<Spin text="Hunting cheapest Greek deals..." sub="Searching all weekends of the year..."/>}
+      {spE&&<Err msg={spE} retry={()=>{setSpL(true);ai(SPECIAL_P,2000).then(d=>{setSpec(d.deals||[]);setSpE("");}).catch(e=>setSpE(e.message)).finally(()=>setSpL(false));}}/>}
+      {!spL&&!spE&&spec.map((deal,i)=>{const tm=TM[deal.price_signal];return(<div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",marginBottom:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}><div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}><span>🇬🇷</span><span style={{fontSize:13,fontFamily:C.serif,fontStyle:"italic",color:C.text}}>{deal.city}</span><Badge l={`#${i+1} Cheapest`} c={C.green} s={C.greenSoft} sm/></div><div style={{fontSize:12,color:C.muted,fontFamily:C.sans}}>{deal.weekend_label}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans,marginTop:2}}>{deal.airline} · {deal.departs_fri} → {deal.returns_sun}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:22,fontFamily:C.serif,color:C.green,fontWeight:500}}>£{deal.price_pp_return}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>pp flight</div><div style={{fontSize:12,color:C.text,fontFamily:C.sans,marginTop:2,fontWeight:500}}>£{deal.total_pp_with_hotel}pp total</div></div></div>
+        <div style={{fontSize:12,color:C.muted,fontFamily:C.sans,fontStyle:"italic",marginBottom:8}}>{deal.why_cheap}</div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:10}}><span style={{fontSize:11,color:CROWD[deal.crowd_level]||C.muted,fontFamily:C.sans}}>● {deal.crowd_level} crowds</span><span style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{deal.weather}</span>{tm&&<Badge l={tm.l} c={tm.c} s={tm.s} sm/>}</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{deal.booking?.flight_url&&<button onClick={()=>go(deal.booking.flight_url)} style={{fontSize:11,fontFamily:C.sans,fontWeight:600,background:C.blue,color:"#fff",border:"none",borderRadius:20,padding:"5px 14px",cursor:"pointer"}}>✈ Book Flight</button>}{deal.booking?.hotel_url&&<button onClick={()=>go(deal.booking.hotel_url)} style={{fontSize:11,fontFamily:C.sans,fontWeight:600,background:C.violet,color:"#fff",border:"none",borderRadius:20,padding:"5px 14px",cursor:"pointer"}}>🏨 Book Hotel</button>}</div>
+      </div>);})}
+    </div>}
+
+    {sub==="longhaul"&&<div>
+      <div style={{background:C.blueSoft,border:`1px solid ${C.blue}33`,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:C.blue,fontFamily:C.sans}}>🌍 5 φθηνότερα 7νύχτα εκτός Ευρώπης — ξενοδοχείο + itinerary included</div>
+      {lhL&&<Spin text="Finding cheapest long haul trips..." sub="Scanning outside Europe..."/>}
+      {lhE&&<Err msg={lhE} retry={()=>{setLhL(true);ai(LONGHAUL_P,4000).then(d=>{setLh(d.trips||[]);setLhE("");}).catch(e=>setLhE(e.message)).finally(()=>setLhL(false));}}/>}
+      {!lhL&&!lhE&&lh.map((t,i)=><TCard key={i} trip={t} onSelect={onSelect} accent={C.blue}/>)}
+    </div>}
+
+    {sub==="uk"&&<div>
+      <div style={{background:C.greenSoft,border:`1px solid ${C.green}33`,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:C.green,fontFamily:C.sans}}>🏴󠁧󠁢󠁥󠁮󠁧󠁿 UK hidden gems by train from London — no flights needed!</div>
+      {ukL&&<Spin text="Finding UK hidden gems..." sub="Searching underrated weekend spots..."/>}
+      {ukE&&<Err msg={ukE} retry={()=>{setUkL(true);ai(UK_P,2500).then(d=>{setUk(d.trips||[]);setUkE("");}).catch(e=>setUkE(e.message)).finally(()=>setUkL(false));}}/>}
+      {!ukL&&!ukE&&uk.map((t,i)=>{
+        const trip={city:t.city,country:t.region||"UK",tagline:t.tagline,transport_type:"train",nights:2,outbound:{from:t.train_from,departs:t.departs_fri,price_pp:t.train_pp_return/2},return:{departs:t.returns_sun,price_pp:t.train_pp_return/2},hotel:t.hotel,vibe_scores:t.vibe_scores,budget_2days:t.budget_2days,escape_score:t.escape_score,why_go:t.why_this_weekend,hidden_gem_tip:t.hidden_gem_tip,top_vibes:t.top_vibes,timing:t.timing,booking:{flight_url:t.booking?.train_url,flight_site:"Trainline",hotel_url:t.booking?.hotel_url,hotel_site:t.booking?.hotel_site}};
+        return <TCard key={i} trip={trip} onSelect={onSelect} accent={C.green}/>;
+      })}
+    </div>}
+    </div>
+  </div>);
+}
+
+// ── TOOLS TAB ─────────────────────────────────────────────────────────────────
+function ToolsTab(){
+  const [sub,setSub]=useState("algorithm");
+  const [algo,setAlgo]=useState(null);const [algoL,setAlgoL]=useState(false);const [algoE,setAlgoE]=useState("");const [algoLoaded,setAlgoLoaded]=useState(false);
+  const [calDest,setCalDest]=useState("");const [calData,setCalData]=useState(null);const [calL,setCalL]=useState(false);const [calE,setCalE]=useState("");
+  const [curAmount,setCurAmount]=useState(500);const [curCities,setCurCities]=useState("Bangkok, Bali, Tokyo, New York, Lisbon");const [curData,setCurData]=useState(null);const [curL,setCurL]=useState(false);const [curE,setCurE]=useState("");
+  const [alerts,setAlerts]=useState(()=>{try{return JSON.parse(localStorage.getItem("travio_alerts")||"[]");}catch{return [];}});
+  const [alertRoute,setAlertRoute]=useState("");const [alertThresh,setAlertThresh]=useState(120);const [alertAna,setAlertAna]=useState(null);const [alertL,setAlertL]=useState(false);const [alertE,setAlertE]=useState("");
+  useEffect(()=>{try{localStorage.setItem("travio_alerts",JSON.stringify(alerts));}catch{}},[alerts]);
+  useEffect(()=>{if(sub==="algorithm"&&!algoLoaded){setAlgoL(true);setAlgoLoaded(true);ai(ALGORITHM_P,2500).then(d=>setAlgo(d)).catch(e=>setAlgoE(e.message)).finally(()=>setAlgoL(false));}},[sub]);
+  async function loadCal(){if(!calDest)return;setCalL(true);setCalE("");try{const d=await ai(CALENDAR_P(calDest),2000);setCalData(d);}catch(e){setCalE(e.message);}setCalL(false);}
+  async function loadCur(){setCurL(true);setCurE("");try{const d=await ai(CURRENCY_P(curAmount,curCities),2000);setCurData(d);}catch(e){setCurE(e.message);}setCurL(false);}
+  async function analyseAlert(){if(!alertRoute)return;setAlertL(true);setAlertE("");try{const d=await ai(ALERTS_P(alertRoute),1000);setAlertAna(d.analysis);}catch(e){setAlertE(e.message);}setAlertL(false);}
+  const TIER_COL={very_cheap:C.green,cheap:"#4ade80",moderate:C.amber,expensive:C.rose,peak:C.red};
+  const TIER_LABEL={very_cheap:"Very Cheap",cheap:"Cheap",moderate:"Moderate",expensive:"Expensive",peak:"Peak"};
+  const inp={background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,padding:"10px 14px",fontSize:13,fontFamily:C.sans,width:"100%",boxSizing:"border-box"};
+
+  return(<div style={{padding:"20px 16px"}}>
+    <div style={{marginBottom:16}}><div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>Tools</div><div style={{fontSize:13,color:C.muted,fontFamily:C.sans,marginBottom:14}}>Smart tools to save more</div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{[["algorithm","🕐 Algorithm"],["calendar","📅 Price Calendar"],["currency","💱 Currency Power"],["alerts","🔔 Price Alerts"]].map(([k,l])=><button key={k} onClick={()=>setSub(k)} style={{padding:"10px",borderRadius:12,cursor:"pointer",fontSize:11,fontFamily:C.sans,fontWeight:500,border:`1px solid ${sub===k?C.violet+"66":C.border}`,background:sub===k?C.violetSoft:C.card,color:sub===k?C.violet:C.muted}}>{l}</button>)}</div></div>
+    <div style={{marginTop:16}}>
+
+    {sub==="algorithm"&&<div>
+      <div style={{background:C.violetSoft,border:`1px solid ${C.violet}33`,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:C.violet,fontFamily:C.sans}}>🕐 Insider knowledge: exactly when each airline drops prices</div>
+      {algoL&&<Spin text="Loading airline secrets..." sub="Analysing booking patterns..."/>}
+      {algoE&&<Err msg={algoE} retry={()=>{setAlgoL(true);ai(ALGORITHM_P,2500).then(d=>{setAlgo(d);setAlgoE("");}).catch(e=>setAlgoE(e.message)).finally(()=>setAlgoL(false));}}/>}
+      {!algoL&&!algoE&&algo&&<div>
+        {(algo.airlines||[]).map((a,i)=><div key={i} style={{background:C.card,borderRadius:14,padding:18,marginBottom:12,border:`1px solid ${C.border}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:24}}>{a.logo_emoji}</span><div style={{fontSize:16,fontFamily:C.serif,color:C.text}}>{a.name}</div></div>
+            <button onClick={()=>go(a.booking_url)} style={{fontSize:11,fontFamily:C.sans,fontWeight:600,background:C.blue,color:"#fff",border:"none",borderRadius:20,padding:"5px 14px",cursor:"pointer"}}>Book →</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+            <div style={{background:C.greenSoft,borderRadius:8,padding:"10px"}}><div style={{fontSize:9,color:C.green,fontFamily:C.sans,marginBottom:3,letterSpacing:"0.1em"}}>BEST DAY</div><div style={{fontSize:13,color:C.text,fontFamily:C.sans,fontWeight:500}}>{a.best_day_to_book}</div></div>
+            <div style={{background:C.blueSoft,borderRadius:8,padding:"10px"}}><div style={{fontSize:9,color:C.blue,fontFamily:C.sans,marginBottom:3,letterSpacing:"0.1em"}}>BEST TIME</div><div style={{fontSize:13,color:C.text,fontFamily:C.sans,fontWeight:500}}>{a.best_time}</div></div>
+          </div>
+          <div style={{fontSize:12,color:C.muted,fontFamily:C.sans,lineHeight:1.6,marginBottom:8}}>{a.sale_pattern}</div>
+          <div style={{background:C.amberSoft,borderRadius:8,padding:"8px 12px",marginBottom:6,fontSize:12,color:C.amber,fontFamily:C.sans}}>💡 {a.secret_tip}</div>
+          <div style={{fontSize:11,color:C.red,fontFamily:C.sans}}>❌ Avoid: {a.avoid}</div>
         </div>)}
-      </div>);
-    })}
-    {!loading&&!err&&weekends.length===0&&(<div style={{textAlign:"center",padding:"40px 0"}}><div style={{fontSize:15,fontFamily:C.serif,fontStyle:"italic",color:C.muted,marginBottom:12}}>No results yet</div><button onClick={hunt} style={{fontSize:13,fontFamily:C.sans,background:C.text,color:C.bg,border:"none",borderRadius:20,padding:"10px 24px",cursor:"pointer"}}>Try Again</button></div>)}
-  </div>);
-}
+        {algo.general_tips&&<div style={{background:C.card,borderRadius:14,padding:18,marginBottom:12,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:12,textTransform:"uppercase"}}>General Tips</div>
+          {algo.general_tips.map((t,i)=><div key={i} style={{fontSize:12,color:C.text,fontFamily:C.sans,padding:"6px 0",borderBottom:i<algo.general_tips.length-1?`1px solid ${C.border}`:"none",display:"flex",gap:10}}><span style={{color:C.violet}}>›</span>{t}</div>)}
+        </div>}
+        {algo.price_drop_windows&&<div style={{background:C.card,borderRadius:14,padding:18,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:12,textTransform:"uppercase"}}>Price Drop Windows</div>
+          {algo.price_drop_windows.map((w,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:i<algo.price_drop_windows.length-1?`1px solid ${C.border}`:"none"}}><div><div style={{fontSize:12,fontFamily:C.sans,color:C.text}}>{w.window}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{w.applies_to}</div></div><div style={{fontSize:13,color:C.green,fontFamily:C.sans,fontWeight:600}}>{w.saving}</div></div>)}
+        </div>}
+      </div>}
+    </div>}
 
-// ── WEEKEND ───────────────────────────────────────────────────────────────────
-function WeekendTab({onSelect}){
-  const [trips,setTrips]=useState([]);const [loading,setLoading]=useState(true);const [err,setErr]=useState("");
-  const [airports,setAirports]=useState(["LHR","LGW","LCY"]);
-  async function load(){setLoading(true);setErr("");try{const d=await ai(WEEKEND_P+` Airports: ${airports.join(",")}`);setTrips(d.trips||[]);}catch(e){setErr(e.message);}setLoading(false);}
-  useEffect(()=>{load();},[]);
-  return(<div style={{padding:"20px 16px"}}>
-    <div style={{marginBottom:20}}><div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>This Weekend</div><div style={{fontSize:13,color:C.muted,fontFamily:C.sans}}>Friday 18:30+ · back Sunday by 23:30</div></div>
-    <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-      {["LHR","LGW","LCY","STN"].map(ap=>(<button key={ap} onClick={()=>setAirports(p=>p.includes(ap)?p.filter(x=>x!==ap):[...p,ap])} style={{fontSize:11,borderRadius:20,padding:"5px 12px",cursor:"pointer",fontFamily:C.sans,fontWeight:500,border:"1px solid",borderColor:airports.includes(ap)?C.blue:C.border,color:airports.includes(ap)?C.blue:C.muted,background:airports.includes(ap)?C.blueSoft:C.card}}>{ap}</button>))}
-      <button onClick={load} style={{marginLeft:"auto",fontSize:11,borderRadius:20,padding:"5px 14px",cursor:"pointer",fontFamily:C.sans,border:`1px solid ${C.border}`,color:C.muted,background:C.card}}>↺ Refresh</button>
-    </div>
-    {loading&&<Loader text="Scanning this weekend..." sub="Flights · hotels · vibe scores · weather"/>}
-    {err&&<ErrBox msg={err} onRetry={load}/>}
-    {!loading&&!err&&trips.map((t,i)=><TripCard key={i} trip={t} onSelect={onSelect}/>)}
-  </div>);
-}
-
-// ── CUSTOM ────────────────────────────────────────────────────────────────────
-function CustomTripTab({onSelect}){
-  const today=new Date().toISOString().split("T")[0];
-  const [f,setF]=useState({from:"LHR",dest:"",depart:today,ret:"",pax:2,budget:1000});
-  const [trips,setTrips]=useState([]);const [loading,setLoading]=useState(false);const [err,setErr]=useState("");const [done,setDone]=useState(false);
-  const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  async function search(){if(!f.depart||!f.ret)return;setLoading(true);setDone(true);setErr("");try{const d=await ai(CUSTOM_P(f.from,f.dest,f.depart,f.ret,f.pax,f.budget));setTrips(d.trips||[]);}catch(e){setErr(e.message);}setLoading(false);}
-  const inp={background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,padding:"12px 14px",fontSize:13,fontFamily:C.sans,width:"100%",boxSizing:"border-box"};
-  return(<div style={{padding:"20px 16px"}}>
-    <div style={{marginBottom:20}}><div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>Plan Your Trip</div><div style={{fontSize:13,color:C.muted,fontFamily:C.sans}}>Pick your dates — we find the best options</div></div>
-    <div style={{background:C.card,borderRadius:16,padding:20,marginBottom:20,border:`1px solid ${C.border}`}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
-        <div><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>From</div><select value={f.from} onChange={e=>set("from",e.target.value)} style={inp}>{["LHR","LGW","LCY","STN","St Pancras"].map(a=><option key={a}>{a}</option>)}</select></div>
-        <div><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Destination</div><input value={f.dest} onChange={e=>set("dest",e.target.value)} placeholder="Anywhere..." style={inp}/></div>
-        <div><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Depart</div><input type="date" value={f.depart} onChange={e=>set("depart",e.target.value)} style={inp}/></div>
-        <div><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Return</div><input type="date" value={f.ret} onChange={e=>set("ret",e.target.value)} style={inp}/></div>
+    {sub==="calendar"&&<div>
+      <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:16,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:12,color:C.dim,fontFamily:C.sans,marginBottom:8}}>Which destination?</div>
+        <div style={{display:"flex",gap:8}}><input value={calDest} onChange={e=>setCalDest(e.target.value)} placeholder="e.g. Athens, Bangkok, New York..." style={{...inp,flex:1}}/><button onClick={loadCal} disabled={!calDest||calL} style={{background:C.violet,border:"none",borderRadius:10,color:"#fff",padding:"0 16px",fontSize:12,cursor:"pointer",fontFamily:C.sans,fontWeight:600,opacity:!calDest?0.4:1,whiteSpace:"nowrap"}}>{calL?"Loading...":"Show"}</button></div>
       </div>
-      <div style={{marginBottom:12}}><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Travellers · {f.pax}</div><input type="range" min={1} max={8} value={f.pax} onChange={e=>set("pax",+e.target.value)} style={{width:"100%"}}/></div>
-      <div style={{marginBottom:16}}><div style={{fontSize:10,color:C.dim,marginBottom:6,fontFamily:C.sans,textTransform:"uppercase"}}>Max budget pp · £{f.budget}</div><input type="range" min={200} max={5000} step={50} value={f.budget} onChange={e=>set("budget",+e.target.value)} style={{width:"100%"}}/></div>
-      <button onClick={search} disabled={!f.depart||!f.ret} style={{width:"100%",background:!f.depart||!f.ret?C.border:C.blue,border:"none",borderRadius:12,color:!f.depart||!f.ret?C.muted:"#fff",padding:"14px",fontSize:14,fontFamily:C.sans,fontWeight:600,cursor:"pointer"}}>Find Best Options →</button>
-    </div>
-    {loading&&<Loader text="Finding your perfect trip..." sub="Comparing destinations · prices · timing"/>}
-    {err&&<ErrBox msg={err} onRetry={search}/>}
-    {!loading&&!err&&done&&trips.length===0&&<div style={{textAlign:"center",padding:"32px 0",color:C.muted,fontFamily:C.serif,fontStyle:"italic"}}>No results — try adjusting dates</div>}
-    {!loading&&!err&&trips.map((t,i)=><TripCard key={i} trip={t} onSelect={onSelect}/>)}
-  </div>);
-}
+      {calE&&<Err msg={calE} retry={loadCal}/>}
+      {calData&&<div>
+        <div style={{fontSize:15,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:16}}>Price calendar · {calData.destination}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+          {(calData.months||[]).map((m,i)=><div key={i} style={{background:C.card,borderRadius:12,padding:14,border:`1px solid ${C.border}`,position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",top:0,left:0,right:0,height:4,background:TIER_COL[m.price_tier]||C.muted}}/>
+            <div style={{marginTop:4}}>
+              <div style={{fontSize:13,fontFamily:C.sans,fontWeight:600,color:C.text,marginBottom:2}}>{m.month}</div>
+              <div style={{fontSize:11,color:TIER_COL[m.price_tier]||C.muted,fontFamily:C.sans,fontWeight:500,marginBottom:4}}>{TIER_LABEL[m.price_tier]} · £{m.avg_price_pp}pp</div>
+              <div style={{fontSize:10,color:C.muted,fontFamily:C.sans,marginBottom:4}}>{m.weather} · {m.crowd_level} crowds</div>
+              <div style={{fontSize:10,color:C.dim,fontFamily:C.sans,fontStyle:"italic"}}>{m.tip}</div>
+            </div>
+          </div>)}
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {Object.entries(TIER_COL).map(([k,c])=><div key={k} style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:10,height:10,borderRadius:2,background:c}}/><span style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>{TIER_LABEL[k]}</span></div>)}
+        </div>
+      </div>}
+    </div>}
 
-// ── GREECE ────────────────────────────────────────────────────────────────────
-function GreeceTab(){
-  const [data,setData]=useState(null);const [loading,setLoading]=useState(true);const [err,setErr]=useState("");const [city,setCity]=useState("athens");
-  async function load(){setLoading(true);setErr("");try{const d=await ai(GREECE_P);setData(d);}catch(e){setErr(e.message);}setLoading(false);}
-  useEffect(()=>{load();},[]);
-  const rows=data?.[city]||[];const CROWD={low:C.green,medium:C.amber,high:C.red};
-  return(<div style={{padding:"20px 16px"}}>
-    <div style={{marginBottom:20}}><div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>Greek Getaways</div><div style={{fontSize:13,color:C.muted,fontFamily:C.sans}}>Cheapest upcoming weekends from London</div></div>
-    <div style={{display:"flex",gap:8,marginBottom:20}}>{[["athens","🏛 Athens"],["thessaloniki","🌊 Thessaloniki"]].map(([k,lbl])=>(<button key={k} onClick={()=>setCity(k)} style={{flex:1,padding:"12px",borderRadius:12,cursor:"pointer",fontSize:13,fontFamily:C.sans,fontWeight:500,border:`1px solid ${city===k?C.amber+"66":C.border}`,background:city===k?C.amberSoft:C.card,color:city===k?C.amber:C.muted}}>{lbl}</button>))}</div>
-    {loading&&<Loader text="Scanning Greek escape windows..." sub="Checking fares for next 8 weekends"/>}
-    {err&&<ErrBox msg={err} onRetry={load}/>}
-    {!loading&&!err&&rows.map((r,i)=>{const tm=TIMING_MAP[r.price_signal];return(<div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",marginBottom:10}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-        <div><div style={{fontSize:15,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:2}}>{r.weekend_label}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{r.airline} · Fri {r.departs_fri} → Sun {r.returns_sun}</div></div>
-        <div style={{textAlign:"right"}}><div style={{fontSize:20,fontFamily:C.serif,color:C.amber,fontWeight:500}}>£{r.price_pp_return}</div><div style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>pp return</div></div>
+    {sub==="currency"&&<div>
+      <div style={{background:C.card,borderRadius:14,padding:18,marginBottom:16,border:`1px solid ${C.border}`}}>
+        <div style={{marginBottom:12}}><div style={{fontSize:10,color:C.dim,fontFamily:C.sans,marginBottom:6}}>HOW MUCH · £{curAmount}</div><input type="range" min={100} max={3000} step={50} value={curAmount} onChange={e=>setCurAmount(+e.target.value)} style={{width:"100%"}}/></div>
+        <div style={{marginBottom:14}}><div style={{fontSize:10,color:C.dim,fontFamily:C.sans,marginBottom:6}}>COMPARE CITIES</div><input value={curCities} onChange={e=>setCurCities(e.target.value)} placeholder="Bangkok, Bali, Tokyo..." style={inp}/></div>
+        <button onClick={loadCur} disabled={curL} style={{width:"100%",background:C.amber,border:"none",borderRadius:12,color:"#fff",padding:"12px",fontSize:13,fontFamily:C.sans,fontWeight:600,cursor:"pointer"}}>{curL?"Calculating...":"See Buying Power →"}</button>
       </div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><span style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{r.weather}</span><span style={{fontSize:11,color:CROWD[r.crowd_level]||C.muted,fontFamily:C.sans}}>● {r.crowd_level} crowds</span><span style={{fontSize:12,color:C.text,fontFamily:C.sans,fontWeight:500}}>£{r.total_pp}pp total</span></div>
-        {tm&&<Badge label={tm.label} color={tm.color} soft={tm.soft} small/>}
+      {curE&&<Err msg={curE} retry={loadCur}/>}
+      {curData&&<div>
+        <div style={{fontSize:15,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:16}}>£{curData.amount_gbp} gets you...</div>
+        {(curData.cities||[]).map((city,i)=>{
+          const VAL={exceptional:C.green,great:C.teal,good:C.blue,fair:C.amber};
+          return(<div key={i} style={{background:C.card,borderRadius:14,padding:18,marginBottom:12,border:`1px solid ${C.border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:22}}>{city.emoji}</span><div><div style={{fontSize:16,fontFamily:C.serif,color:C.text}}>{city.city}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>{city.country} · {city.currency} · {city.exchange_rate}</div></div></div>
+              <Badge l={city.value_rating} c={VAL[city.value_rating]||C.amber} s={(VAL[city.value_rating]||C.amber)+"18"} sm/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+              {[["🏨",`${city.hotel_nights}`,`hotel nights`],["🍽",`${city.restaurant_meals}`,`restaurant meals`],["☕",`${city.coffee_cups}`,`coffees`]].map(([ic,v2,l])=><div key={l} style={{background:C.bg,borderRadius:8,padding:"10px",textAlign:"center"}}><div style={{fontSize:16}}>{ic}</div><div style={{fontSize:16,fontFamily:C.serif,color:C.text,fontWeight:500}}>{v2}</div><div style={{fontSize:9,color:C.dim,fontFamily:C.sans}}>{l}</div></div>)}
+            </div>
+            <div style={{fontSize:12,color:C.muted,fontFamily:C.sans,fontStyle:"italic",lineHeight:1.6}}>{city.what_you_can_do}</div>
+          </div>);
+        })}
+      </div>}
+    </div>}
+
+    {sub==="alerts"&&<div>
+      <div style={{background:C.card,borderRadius:16,padding:20,marginBottom:16,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:13,fontFamily:C.sans,fontWeight:600,color:C.text,marginBottom:14}}>Price Intelligence</div>
+        <div style={{display:"flex",gap:8,marginBottom:12}}><input value={alertRoute} onChange={e=>setAlertRoute(e.target.value)} placeholder="e.g. LHR → Bangkok" style={{...inp,flex:1}}/><button onClick={analyseAlert} disabled={!alertRoute} style={{background:C.violet,border:"none",borderRadius:10,color:"#fff",padding:"0 16px",fontSize:12,cursor:"pointer",fontFamily:C.sans,fontWeight:600,opacity:!alertRoute?0.4:1,whiteSpace:"nowrap"}}>Analyse</button></div>
+        {alertL&&<div style={{fontSize:13,color:C.muted,fontFamily:C.serif,fontStyle:"italic"}}>Checking price history...</div>}
+        {alertE&&<Err msg={alertE} retry={analyseAlert}/>}
+        {!alertL&&!alertE&&alertAna&&<div style={{background:C.bg,borderRadius:12,padding:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><div style={{fontSize:14,fontFamily:C.serif,fontStyle:"italic"}}>{alertAna.route}</div><TMBadge sig={alertAna.signal}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>{[["Current",`£${alertAna.current_price_pp}`,C.text],["30d Avg",`£${alertAna.historic_avg_pp}`,C.muted],["Lowest",`£${alertAna.lowest_seen_pp}`,C.green]].map(([l,v2,col])=><div key={l} style={{background:C.card,borderRadius:8,padding:10,textAlign:"center"}}><div style={{fontSize:9,color:C.dim,marginBottom:4,fontFamily:C.sans}}>{l}</div><div style={{fontSize:15,fontFamily:C.serif,color:col}}>{v2}</div></div>)}</div>
+          <div style={{fontSize:13,color:C.text,fontFamily:C.sans,lineHeight:1.6,marginBottom:8}}>{alertAna.recommendation}</div>
+          {(alertAna.reasons||[]).map((r,i)=><div key={i} style={{fontSize:12,color:C.muted,padding:"5px 0",borderTop:`1px solid ${C.border}`,display:"flex",gap:8,fontFamily:C.sans}}><span style={{color:C.violet}}>›</span>{r}</div>)}
+          {alertAna.airline_sales&&<div style={{fontSize:12,color:C.amber,marginTop:10,padding:"10px",background:C.amberSoft,borderRadius:8,fontFamily:C.sans}}>🔖 {alertAna.airline_sales}</div>}
+        </div>}
       </div>
-    </div>);})}
+      <div style={{background:C.card,borderRadius:16,padding:20,marginBottom:16,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:13,fontFamily:C.sans,fontWeight:600,color:C.text,marginBottom:14}}>Set Price Alert</div>
+        <div style={{marginBottom:12}}><input value={alertRoute} onChange={e=>setAlertRoute(e.target.value)} placeholder="Route e.g. LHR → Bangkok" style={inp}/></div>
+        <div style={{marginBottom:16}}><div style={{fontSize:10,color:C.dim,fontFamily:C.sans,marginBottom:6}}>ALERT BELOW · £{alertThresh}pp</div><input type="range" min={40} max={600} step={5} value={alertThresh} onChange={e=>setAlertThresh(+e.target.value)} style={{width:"100%"}}/></div>
+        <button onClick={()=>{if(!alertRoute)return;setAlerts(p=>[{id:Date.now(),route:alertRoute,threshold:alertThresh,created:new Date().toLocaleDateString()},...p]);setAlertRoute("");}} disabled={!alertRoute} style={{width:"100%",background:!alertRoute?C.border:C.rose,border:"none",borderRadius:12,color:!alertRoute?C.muted:"#fff",padding:"13px",fontSize:13,fontFamily:C.sans,fontWeight:600,cursor:"pointer",opacity:!alertRoute?0.5:1}}>🔔 Add Alert</button>
+      </div>
+      {alerts.length>0&&<div><div style={{fontSize:10,color:C.dim,fontFamily:C.sans,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:12}}>Active · {alerts.length}</div>{alerts.map(a=><div key={a.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 16px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:14,fontFamily:C.serif,fontStyle:"italic",color:C.text}}>{a.route}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>Below £{a.threshold}pp · {a.created}</div></div><button onClick={()=>setAlerts(p=>p.filter(x=>x.id!==a.id))} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:20}}>×</button></div>)}</div>}
+    </div>}
+    </div>
   </div>);
 }
 
-// ── ALERTS ────────────────────────────────────────────────────────────────────
-function AlertsTab({alerts,setAlerts}){
-  const [route,setRoute]=useState("");const [threshold,setThreshold]=useState(120);const [analysis,setAnalysis]=useState(null);const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
-  async function analyse(){if(!route)return;setLoading(true);setErr("");try{const d=await ai(TIMING_P(route),1000);setAnalysis(d.analysis);}catch(e){setErr(e.message);}setLoading(false);}
-  const inp={background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,padding:"12px 14px",fontSize:13,fontFamily:C.sans,width:"100%",boxSizing:"border-box"};
+// ── MY MAP ────────────────────────────────────────────────────────────────────
+const CONTINENTS={
+  "Europe":["Albania","Andorra","Austria","Belgium","Bosnia","Bulgaria","Croatia","Cyprus","Czech Republic","Denmark","Estonia","Finland","France","Germany","Greece","Hungary","Iceland","Ireland","Italy","Kosovo","Latvia","Liechtenstein","Lithuania","Luxembourg","Malta","Moldova","Monaco","Montenegro","Netherlands","North Macedonia","Norway","Poland","Portugal","Romania","San Marino","Serbia","Slovakia","Slovenia","Spain","Sweden","Switzerland","Turkey","Ukraine","United Kingdom","Vatican"],
+  "Asia":["Afghanistan","Armenia","Azerbaijan","Bahrain","Bangladesh","Bhutan","Brunei","Cambodia","China","Georgia","India","Indonesia","Iran","Iraq","Israel","Japan","Jordan","Kazakhstan","Kuwait","Kyrgyzstan","Laos","Lebanon","Malaysia","Maldives","Mongolia","Myanmar","Nepal","North Korea","Oman","Pakistan","Palestine","Philippines","Qatar","Saudi Arabia","Singapore","South Korea","Sri Lanka","Syria","Taiwan","Tajikistan","Thailand","Timor-Leste","Turkmenistan","UAE","Uzbekistan","Vietnam","Yemen"],
+  "Americas":["Antigua","Argentina","Bahamas","Barbados","Belize","Bolivia","Brazil","Canada","Chile","Colombia","Costa Rica","Cuba","Dominican Republic","Ecuador","El Salvador","Grenada","Guatemala","Guyana","Haiti","Honduras","Jamaica","Mexico","Nicaragua","Panama","Paraguay","Peru","Saint Lucia","Suriname","Trinidad","USA","Uruguay","Venezuela"],
+  "Africa":["Algeria","Angola","Benin","Botswana","Burkina Faso","Burundi","Cameroon","Cape Verde","CAR","Chad","Comoros","Congo","DR Congo","Djibouti","Egypt","Equatorial Guinea","Eritrea","Eswatini","Ethiopia","Gabon","Gambia","Ghana","Guinea","Guinea-Bissau","Ivory Coast","Kenya","Lesotho","Liberia","Libya","Madagascar","Malawi","Mali","Mauritania","Mauritius","Morocco","Mozambique","Namibia","Niger","Nigeria","Rwanda","São Tomé","Senegal","Seychelles","Sierra Leone","Somalia","South Africa","South Sudan","Sudan","Tanzania","Togo","Tunisia","Uganda","Zambia","Zimbabwe"],
+  "Oceania":["Australia","Fiji","Kiribati","Marshall Islands","Micronesia","Nauru","New Zealand","Palau","Papua New Guinea","Samoa","Solomon Islands","Tonga","Tuvalu","Vanuatu"],
+};
+
+function MapTab(){
+  const [visited,setVisited]=useState(()=>{try{return JSON.parse(localStorage.getItem("travio_map")||"[]");}catch{return [];}});
+  const [cont,setCont]=useState("Europe");
+  const [search,setSearch]=useState("");
+  useEffect(()=>{try{localStorage.setItem("travio_map",JSON.stringify(visited));}catch{}},[visited]);
+  const toggle=(c)=>setVisited(p=>p.includes(c)?p.filter(x=>x!==c):[...p,c]);
+  const total=Object.values(CONTINENTS).flat().length;
+  const contCounts=Object.entries(CONTINENTS).map(([c,countries])=>({c,total:countries.length,done:countries.filter(co=>visited.includes(co)).length}));
+  const allCountries=Object.values(CONTINENTS).flat().filter(c=>!search||c.toLowerCase().includes(search.toLowerCase()));
+  const filtered=search?allCountries:(CONTINENTS[cont]||[]);
+
   return(<div style={{padding:"20px 16px"}}>
-    <div style={{marginBottom:20}}><div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>Price Alerts</div><div style={{fontSize:13,color:C.muted,fontFamily:C.sans}}>Analyse routes · track prices</div></div>
-    <div style={{background:C.card,borderRadius:16,padding:20,marginBottom:16,border:`1px solid ${C.border}`}}>
-      <div style={{fontSize:13,fontFamily:C.sans,fontWeight:600,color:C.text,marginBottom:14}}>Price Intelligence</div>
-      <div style={{display:"flex",gap:8,marginBottom:12}}><input value={route} onChange={e=>setRoute(e.target.value)} placeholder="e.g. LHR → Athens" style={{...inp,flex:1}}/><button onClick={analyse} disabled={!route} style={{background:C.violet,border:"none",borderRadius:10,color:"#fff",padding:"0 16px",fontSize:12,cursor:"pointer",fontFamily:C.sans,fontWeight:600,opacity:!route?0.4:1,whiteSpace:"nowrap"}}>Analyse</button></div>
-      {loading&&<div style={{fontSize:13,color:C.muted,fontFamily:C.serif,fontStyle:"italic"}}>Checking price history...</div>}
-      {err&&<ErrBox msg={err} onRetry={analyse}/>}
-      {!loading&&!err&&analysis&&(<div style={{background:C.bg,borderRadius:12,padding:16}}>
-        <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}><div style={{fontSize:14,fontFamily:C.serif,fontStyle:"italic"}}>{analysis.route}</div><TimingBadge signal={analysis.signal}/></div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>{[["Current",`£${analysis.current_price_pp}`,C.text],["30d Avg",`£${analysis.historic_avg_pp}`,C.muted],["Lowest",`£${analysis.lowest_seen_pp}`,C.green]].map(([l,v,col])=>(<div key={l} style={{background:C.card,borderRadius:8,padding:10,textAlign:"center"}}><div style={{fontSize:9,color:C.dim,marginBottom:4,fontFamily:C.sans}}>{l}</div><div style={{fontSize:15,fontFamily:C.serif,color:col}}>{v}</div></div>))}</div>
-        <div style={{fontSize:13,color:C.text,fontFamily:C.sans,lineHeight:1.6,marginBottom:8}}>{analysis.recommendation}</div>
-        {(analysis.reasons||[]).map((r,i)=>(<div key={i} style={{fontSize:12,color:C.muted,padding:"5px 0",borderTop:`1px solid ${C.border}`,display:"flex",gap:8,fontFamily:C.sans}}><span style={{color:C.violet}}>›</span>{r}</div>))}
-        {analysis.airline_sales&&<div style={{fontSize:12,color:C.amber,marginTop:10,padding:"10px",background:C.amberSoft,borderRadius:8,fontFamily:C.sans}}>🔖 {analysis.airline_sales}</div>}
-      </div>)}
+    <div style={{marginBottom:20}}>
+      <div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text,marginBottom:4}}>My Travel Map</div>
+      <div style={{fontSize:13,color:C.muted,fontFamily:C.sans,marginBottom:16}}>Track your adventures · {visited.length} of {total} countries</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+        {[["🌍",visited.length,"countries"],["🗺",contCounts.filter(c=>c.done>0).length,"continents"],["📊",`${Math.round(visited.length/total*100)}%`,"of world"]].map(([ic,v2,l])=><div key={l} style={{background:C.card,borderRadius:12,padding:"12px",textAlign:"center",border:`1px solid ${C.border}`}}><div style={{fontSize:20}}>{ic}</div><div style={{fontSize:20,fontFamily:C.serif,color:C.text,fontWeight:500}}>{v2}</div><div style={{fontSize:10,color:C.dim,fontFamily:C.sans}}>{l}</div></div>)}
+      </div>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search any country..." style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,padding:"10px 14px",fontSize:13,fontFamily:C.sans,width:"100%",boxSizing:"border-box",marginBottom:12}}/>
+      {!search&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
+        {Object.entries(CONTINENTS).map(([k])=>{const info=contCounts.find(c=>c.c===k)||{done:0,total:0};return(<button key={k} onClick={()=>setCont(k)} style={{fontSize:10,borderRadius:20,padding:"4px 10px",cursor:"pointer",fontFamily:C.sans,fontWeight:500,border:"1px solid",borderColor:cont===k?C.blue:C.border,color:cont===k?C.blue:C.muted,background:cont===k?C.blueSoft:C.card}}>{k} {info.done}/{info.total}</button>);})}
+      </div>}
     </div>
-    <div style={{background:C.card,borderRadius:16,padding:20,marginBottom:16,border:`1px solid ${C.border}`}}>
-      <div style={{fontSize:13,fontFamily:C.sans,fontWeight:600,color:C.text,marginBottom:14}}>Set Price Alert</div>
-      <div style={{marginBottom:12}}><input value={route} onChange={e=>setRoute(e.target.value)} placeholder="e.g. LHR → Athens" style={inp}/></div>
-      <div style={{marginBottom:16}}><div style={{fontSize:10,color:C.dim,fontFamily:C.sans,marginBottom:6,textTransform:"uppercase"}}>Alert below · £{threshold}pp</div><input type="range" min={40} max={400} step={5} value={threshold} onChange={e=>setThreshold(+e.target.value)} style={{width:"100%"}}/></div>
-      <button onClick={()=>{if(!route)return;setAlerts(p=>[{id:Date.now(),route,threshold,created:new Date().toLocaleDateString()},...p]);setRoute("");}} disabled={!route} style={{width:"100%",background:!route?C.border:C.rose,border:"none",borderRadius:12,color:!route?C.muted:"#fff",padding:"13px",fontSize:13,fontFamily:C.sans,fontWeight:600,cursor:"pointer",opacity:!route?0.5:1}}>🔔 Add Alert</button>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+      {filtered.map(country=>{
+        const done=visited.includes(country);
+        return(<button key={country} onClick={()=>toggle(country)} style={{background:done?C.greenSoft:C.card,border:`1px solid ${done?C.green+"55":C.border}`,borderRadius:10,padding:"10px 12px",cursor:"pointer",fontFamily:C.sans,fontSize:12,color:done?C.green:C.text,textAlign:"left",fontWeight:done?600:400,display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14}}>{done?"✓":"○"}</span>{country}
+        </button>);
+      })}
     </div>
-    {alerts.length>0&&(<div><div style={{fontSize:10,color:C.dim,fontFamily:C.sans,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:12}}>Active · {alerts.length}</div>{alerts.map(a=>(<div key={a.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px 16px",marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:14,fontFamily:C.serif,fontStyle:"italic",color:C.text}}>{a.route}</div><div style={{fontSize:11,color:C.muted,fontFamily:C.sans}}>Below £{a.threshold}pp · {a.created}</div></div><button onClick={()=>setAlerts(p=>p.filter(x=>x.id!==a.id))} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:20}}>×</button></div>))}
-    </div>)}
+    {visited.length>0&&<div style={{marginTop:20,background:C.card,borderRadius:14,padding:18,border:`1px solid ${C.border}`}}>
+      <div style={{fontSize:10,color:C.dim,letterSpacing:"0.1em",marginBottom:12,textTransform:"uppercase"}}>Your Countries</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:5}}>{visited.sort().map(c=><span key={c} style={{fontSize:11,color:C.green,background:C.greenSoft,border:`1px solid ${C.green}33`,borderRadius:20,padding:"3px 9px",fontFamily:C.sans}}>{c}</span>)}</div>
+    </div>}
   </div>);
 }
 
-// ── MAIN ──────────────────────────────────────────────────────────────────────
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
 function TravioApp(){
   const [tab,setTab]=useState("hunt");
   const [selected,setSelected]=useState(null);
-  const [alerts,setAlerts]=useState([]);
-  if(selected) return(<div style={{background:C.bg,minHeight:"100%"}}><TripDetail trip={selected} onBack={()=>setSelected(null)}/></div>);
-  const TABS=[{id:"hunt",icon:"🎯",label:"Hunt"},{id:"weekend",icon:"✈",label:"Weekend"},{id:"custom",icon:"📅",label:"Plan"},{id:"greece",icon:"🏛",label:"Greece"},{id:"alerts",icon:"🔔",label:"Alerts"}];
-  return(
-    <div style={{background:C.bg,minHeight:"100%",fontFamily:C.sans}}>
-      <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"16px 20px 0"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <div><div style={{fontSize:10,color:C.dim,letterSpacing:"0.15em",fontFamily:C.sans,textTransform:"uppercase",marginBottom:2}}>AI Travel OS</div><div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text}}>Travio</div></div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:7,height:7,borderRadius:"50%",background:C.green}}/>
-            <span style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>Live</span>
 
-          </div>
-        </div>
-        <div style={{display:"flex",overflowX:"auto"}}>
-          {TABS.map(t=>(<button key={t.id} onClick={()=>setTab(t.id)} style={{flexShrink:0,background:"none",border:"none",borderBottom:tab===t.id?`2px solid ${C.text}`:"2px solid transparent",color:tab===t.id?C.text:C.muted,cursor:"pointer",padding:"10px 12px 12px",fontFamily:C.sans,fontWeight:tab===t.id?600:400,fontSize:12,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}><span style={{fontSize:16}}>{t.icon}</span><span style={{fontSize:10,whiteSpace:"nowrap"}}>{t.label}</span></button>))}
-        </div>
+  if(selected) return <div style={{background:C.bg,minHeight:"100%"}}><TDetail trip={selected} onBack={()=>setSelected(null)}/></div>;
+
+  const TABS=[{id:"hunt",icon:"🎯",l:"Hunt"},{id:"plan",icon:"✈",l:"Plan"},{id:"escapes",icon:"🌍",l:"Escapes"},{id:"tools",icon:"🛠",l:"Tools"},{id:"map",icon:"🗺",l:"My Map"}];
+
+  return(<div style={{background:C.bg,minHeight:"100%",fontFamily:C.sans}}>
+    <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"16px 20px 0"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        <div><div style={{fontSize:10,color:C.dim,letterSpacing:"0.15em",fontFamily:C.sans,textTransform:"uppercase",marginBottom:2}}>AI Travel OS</div><div style={{fontSize:26,fontFamily:C.serif,fontStyle:"italic",color:C.text}}>Travio</div></div>
+        <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:7,height:7,borderRadius:"50%",background:C.green}}/><span style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>Live</span></div>
       </div>
-      {tab==="hunt"&&<AutoHunterTab onSelect={setSelected}/>}
-      {tab==="weekend"&&<WeekendTab onSelect={setSelected}/>}
-      {tab==="custom"&&<CustomTripTab onSelect={setSelected}/>}
-      {tab==="greece"&&<GreeceTab/>}
-      {tab==="alerts"&&<AlertsTab alerts={alerts} setAlerts={setAlerts}/>}
-      <div style={{borderTop:`1px solid ${C.border}`,padding:"14px 20px",display:"flex",justifyContent:"space-between",background:C.card,marginTop:8}}>
-        <span style={{fontSize:10,color:C.dim,fontFamily:C.sans}}>Groq AI · Free · No data stored</span>
-        <span style={{fontSize:10,color:C.dim,fontFamily:C.sans}}>Travio</span>
+      <div style={{display:"flex",overflowX:"auto"}}>
+        {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{flexShrink:0,background:"none",border:"none",borderBottom:tab===t.id?`2px solid ${C.text}`:"2px solid transparent",color:tab===t.id?C.text:C.muted,cursor:"pointer",padding:"10px 12px 12px",fontFamily:C.sans,fontWeight:tab===t.id?600:400,fontSize:12,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}><span style={{fontSize:16}}>{t.icon}</span><span style={{fontSize:10,whiteSpace:"nowrap"}}>{t.l}</span></button>)}
       </div>
     </div>
-  );
+    {tab==="hunt"&&<HuntTab onSelect={setSelected}/>}
+    {tab==="plan"&&<PlanTab onSelect={setSelected}/>}
+    {tab==="escapes"&&<EscapesTab onSelect={setSelected}/>}
+    {tab==="tools"&&<ToolsTab/>}
+    {tab==="map"&&<MapTab/>}
+    <div style={{borderTop:`1px solid ${C.border}`,padding:"14px 20px",display:"flex",justifyContent:"space-between",background:C.card,marginTop:8}}>
+      <span style={{fontSize:10,color:C.dim,fontFamily:C.sans}}>Groq AI · Free · No data stored</span>
+      <span style={{fontSize:10,color:C.dim,fontFamily:C.sans}}>Travio v3</span>
+    </div>
+  </div>);
 }
+
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(TravioApp));
 </script>
 </body>
