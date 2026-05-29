@@ -35,69 +35,20 @@ const VIBE_MAP={romantic:{accent:C.rose,soft:C.roseSoft},foodie:{accent:C.amber,
 const TIMING_MAP={book_now:{label:"Book Now ✓",color:C.green,soft:C.greenSoft},wait_week:{label:"Wait 1 Week",color:C.amber,soft:C.amberSoft},act_today:{label:"Act Today ⚡",color:C.red,soft:C.redSoft}};
 const TICON={flight:"✈",eurostar:"🚄",train:"🚆"};
 
-// ── AI via Netlify Function (no CORS issues) ─────────────────────────────────
+// ── AI via Vercel Serverless Function ────────────────────────────────────────
 async function ai(prompt, maxTokens=3000) {
-  const key = sessionStorage.getItem("GROQ_KEY");
-  if (!key) throw new Error("No API key");
   const res = await fetch("/api/ai", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({prompt, maxTokens, apiKey: key}),
+    body:JSON.stringify({prompt, maxTokens}),
   });
   const d = await res.json();
   if (!res.ok || d.error) throw new Error(d.error || `Error ${res.status}`);
-  return JSON.parse(d.text || "{}");
+  try { return JSON.parse(d.text || "{}"); }
+  catch(e) { throw new Error("AI response was not valid JSON"); }
 }
 
-// ── KEY SETUP ─────────────────────────────────────────────────────────────────
-function KeySetup({ onSave }) {
-  const [key, setKey] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [err, setErr] = useState("");
-  async function testAndSave() {
-    if (!key.trim()) return;
-    setTesting(true); setErr("");
-    try {
-      sessionStorage.setItem("GROQ_KEY", key.trim());
-      const d = await ai('Return this JSON: {"ok":true,"msg":"Travio ready"}', 50);
-      if (d.ok) onSave(key.trim());
-      else throw new Error("Unexpected response");
-    } catch(e) {
-      setErr(e.message);
-      sessionStorage.removeItem("GROQ_KEY");
-    }
-    setTesting(false);
-  }
-  return (
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
-      <div style={{fontFamily:C.serif,fontStyle:"italic",fontSize:40,color:C.text,marginBottom:6}}>Travio</div>
-      <div style={{fontFamily:C.sans,fontSize:13,color:C.muted,marginBottom:32,textAlign:"center"}}>AI Travel OS · 100% Free</div>
-      <div style={{background:C.card,borderRadius:16,padding:28,border:`1px solid ${C.border}`,width:"100%",maxWidth:380}}>
-        <div style={{fontFamily:C.sans,fontSize:15,fontWeight:600,color:C.text,marginBottom:16}}>🚀 Σύνδεση με Groq AI</div>
-        <div style={{background:C.greenSoft,border:`1px solid ${C.green}33`,borderRadius:10,padding:"12px 14px",marginBottom:20}}>
-          <div style={{fontFamily:C.sans,fontSize:12,color:C.green,fontWeight:600,marginBottom:6}}>✓ Εντελώς δωρεάν · Χωρίς πιστωτική κάρτα</div>
-          <div style={{fontFamily:C.sans,fontSize:11,color:C.muted,lineHeight:1.7}}>
-            1. Πήγαινε στο <strong style={{color:C.text}}>console.groq.com</strong><br/>
-            2. Sign up (με Google)<br/>
-            3. Κλίκ <strong style={{color:C.text}}>"API Keys"</strong> → <strong style={{color:C.text}}>"Create API Key"</strong><br/>
-            4. Αντίγραψε και επικόλλησε παρακάτω
-          </div>
-        </div>
-        <input
-          value={key} onChange={e=>setKey(e.target.value)}
-          onKeyDown={e=>e.key==="Enter"&&testAndSave()}
-          placeholder="gsk_..."
-          style={{width:"100%",background:C.bg,border:`1px solid ${err?C.red:C.border}`,borderRadius:10,padding:"12px 14px",fontSize:13,fontFamily:C.sans,color:C.text,marginBottom:12,boxSizing:"border-box",outline:"none"}}
-        />
-        {err && <div style={{fontSize:12,color:C.red,fontFamily:C.sans,marginBottom:12,background:C.redSoft,padding:"10px 12px",borderRadius:8,lineHeight:1.5}}>❌ {err}</div>}
-        <button onClick={testAndSave} disabled={!key.trim()||testing}
-          style={{width:"100%",background:!key.trim()||testing?"#ccc":C.green,border:"none",borderRadius:12,color:"#fff",padding:"14px",fontSize:14,fontFamily:C.sans,fontWeight:600,cursor:key.trim()&&!testing?"pointer":"default"}}>
-          {testing?"Testing key...":"Start Travio →"}
-        </button>
-      </div>
-    </div>
-  );
-}
+
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 function topVibe(s){if(!s)return"aesthetic";return Object.entries(s).sort((a,b)=>b[1]-a[1])[0]?.[0]||"aesthetic";}
@@ -422,11 +373,9 @@ function AlertsTab({alerts,setAlerts}){
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 function TravioApp(){
-  const [apiKey,setApiKey]=useState(sessionStorage.getItem("GROQ_KEY")||"");
   const [tab,setTab]=useState("hunt");
   const [selected,setSelected]=useState(null);
   const [alerts,setAlerts]=useState([]);
-  if(!apiKey) return <KeySetup onSave={k=>{sessionStorage.setItem("GROQ_KEY",k);setApiKey(k);}}/>;
   if(selected) return(<div style={{background:C.bg,minHeight:"100%"}}><TripDetail trip={selected} onBack={()=>setSelected(null)}/></div>);
   const TABS=[{id:"hunt",icon:"🎯",label:"Hunt"},{id:"weekend",icon:"✈",label:"Weekend"},{id:"custom",icon:"📅",label:"Plan"},{id:"greece",icon:"🏛",label:"Greece"},{id:"alerts",icon:"🔔",label:"Alerts"}];
   return(
@@ -437,7 +386,7 @@ function TravioApp(){
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{width:7,height:7,borderRadius:"50%",background:C.green}}/>
             <span style={{fontSize:10,color:C.muted,fontFamily:C.sans}}>Live</span>
-            <button onClick={()=>{sessionStorage.removeItem("GROQ_KEY");setApiKey("");}} style={{fontSize:10,background:"none",border:`1px solid ${C.border}`,borderRadius:10,color:C.dim,cursor:"pointer",padding:"3px 8px",fontFamily:C.sans}}>key</button>
+
           </div>
         </div>
         <div style={{display:"flex",overflowX:"auto"}}>
